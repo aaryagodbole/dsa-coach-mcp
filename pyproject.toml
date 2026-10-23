@@ -3,6 +3,13 @@ name = "dsa-coach-mcp"
 version = "0.1.0"
 description = "MCP server that coaches DSA practice across LeetCode and Codeforces"
 readme = "README.md"
+license = "MIT"
+keywords = ["mcp", "model-context-protocol", "leetcode", "codeforces", "dsa", "spaced-repetition"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+]
 authors = [
     { name = "aaryagodbole", email = "aaryagodbole2005@gmail.com" }
 ]
@@ -23,7 +30,35 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "mypy>=2.4.0",
+    "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.17.2",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ASYNC", "PT", "N"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+packages = ["dsa_coach_mcp"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--strict-markers"
+
+[tool.coverage.run]
+source = ["dsa_coach_mcp"]
+branch = true
+
+[project.urls]
+Homepage = "https://github.com/aaryagodbole/dsa-coach-mcp"
+Issues = "https://github.com/aaryagodbole/dsa-coach-mcp/issues"
