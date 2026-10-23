@@ -68,6 +68,14 @@ def create_server(
     # both start from the same previous schedule.
     review_lock = asyncio.Lock()
 
+    def lookback(days: int | None) -> date | None:
+        """The earliest date ``days`` back from today, or None for all time."""
+
+        if not days:
+            return None
+        now = today()
+        return now - timedelta(days=min(days, (now - date.min).days))
+
     def adapter_for(platform: str) -> PlatformAdapter:
         adapter = adapters.get(platform)
         if adapter is None:
@@ -140,7 +148,13 @@ def create_server(
         short kind, reusing an existing one from mistake_kinds when it fits, and a note
         on what went wrong in the user's own words."""
 
-        adapter_for(platform)
+        adapter = adapter_for(platform)
+        if tags:
+            async with _platform_errors(platform):
+                known = set((await adapter.describe()).tags)
+            unknown = sorted(set(tags) - known)
+            if unknown:
+                raise ToolError(f"Unknown {platform} tags {unknown}; see list_platforms")
         async with review_lock:
             previous = await asyncio.to_thread(store.get, platform, problem_id)
             schedule = srs.review(
@@ -185,15 +199,24 @@ def create_server(
         kind: str | None = None,
         tag: str | None = None,
         platform: str | None = None,
+        problem_id: str | None = None,
         days: Annotated[int | None, Field(ge=1)] = None,
         limit: Annotated[int, Field(ge=1, le=200)] = 20,
     ) -> list[MistakeEntry]:
         """Journaled mistakes, newest first, with the problem each was made on. Filter by
-        label, problem tag, platform, or the last ``days`` days."""
+        label, problem tag, platform, one problem (platform and problem_id), or the last
+        ``days`` days."""
 
-        since = today() - timedelta(days=days) if days else None
+        since = lookback(days)
         return await asyncio.to_thread(
-            lambda: store.mistakes(kind=kind, tag=tag, platform=platform, since=since, limit=limit)
+            lambda: store.mistakes(
+                kind=kind,
+                tag=tag,
+                platform=platform,
+                problem_id=problem_id,
+                since=since,
+                limit=limit,
+            )
         )
 
     @server.tool(annotations=_READ_LOCAL)
@@ -203,8 +226,7 @@ def create_server(
         """Mistake counts per label, broken down by problem tag, platform and month.
         Counts only; reading what they say about the user is up to you."""
 
-        since = today() - timedelta(days=days) if days else None
-        return await asyncio.to_thread(store.patterns, since)
+        return await asyncio.to_thread(store.patterns, lookback(days))
 
     @server.prompt()
     def practice_plan(focus: str = "") -> str:
@@ -226,7 +248,8 @@ def create_server(
 
         return (
             "Quiz me on today's revisions. Call revisions_due, and for each problem call "
-            "list_mistakes to see what I got wrong on it before. Ask me one question at a "
+            "list_mistakes with its platform and problem_id to see what I got wrong on it "
+            "before. Ask me one question at a "
             "time about how I would approach it and what I must not miss this time, "
             "built from those past mistakes, without giving the answer. After I reply, "
             "rate my recall from 0 to 5, then record it with log_review, including any "

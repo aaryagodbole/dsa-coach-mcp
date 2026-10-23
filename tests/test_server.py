@@ -86,13 +86,14 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
     }
 
 
-async def test_prompts_only_name_tools_that_exist(server: MCPServer) -> None:
-    tools = {tool.name for tool in await server.list_tools()}
+async def test_prompts_only_name_tools_and_arguments_that_exist(server: MCPServer) -> None:
+    tools = await server.list_tools()
+    known = {t.name for t in tools} | {arg for t in tools for arg in t.input_schema["properties"]}
 
     for prompt in await server.list_prompts():
         text = (await server.get_prompt(prompt.name, {})).messages[0].content.text
         named = {word.strip(".,") for word in text.split() if "_" in word}
-        assert named <= tools, (prompt.name, named - tools)
+        assert named <= known, (prompt.name, named - known)
 
 
 async def test_profile_returns_most_recent_submissions_first(server: MCPServer) -> None:
@@ -225,3 +226,32 @@ async def test_a_blank_mistake_is_rejected_and_nothing_is_saved(server: MCPServe
 
     assert (await call(server, "revisions_due"))["result"] == []
     assert (await call(server, "mistake_kinds"))["result"] == []
+
+
+async def test_review_tags_must_come_from_the_platform(server: MCPServer) -> None:
+    with pytest.raises(ToolError, match="Unknown fake tags"):
+        await server.call_tool("log_review", {**REVIEW, "tags": ["made-up"]})
+
+
+async def test_a_huge_lookback_means_all_time(server: MCPServer) -> None:
+    await call(server, "log_review", **REVIEW, mistakes=[{"kind": "k", "note": "n"}])
+
+    patterns = await call(server, "mistake_patterns", days=10**9)
+    journal = (await call(server, "list_mistakes", days=10**9))["result"]
+
+    assert [k["kind"] for k in patterns["kinds"]] == ["k"]
+    assert len(journal) == 1
+
+
+async def test_mistakes_can_be_read_for_one_problem(server: MCPServer) -> None:
+    await call(server, "log_review", **REVIEW, mistakes=[{"kind": "k", "note": "on p0"}])
+    await call(
+        server,
+        "log_review",
+        **{**REVIEW, "problem_id": "p1", "title": "P1", "url": "https://example.com/p1"},
+        mistakes=[{"kind": "k", "note": "on p1"}],
+    )
+
+    journal = (await call(server, "list_mistakes", platform="fake", problem_id="p0"))["result"]
+
+    assert [m["note"] for m in journal] == ["on p0"]

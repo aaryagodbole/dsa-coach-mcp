@@ -176,10 +176,13 @@ class ReviewStore:
         kind: str | None = None,
         tag: str | None = None,
         platform: str | None = None,
+        problem_id: str | None = None,
         since: date | None = None,
         limit: int,
     ) -> list[MistakeEntry]:
-        where, params = self._filters(kind=kind, tag=tag, platform=platform, since=since)
+        where, params = self._filters(
+            kind=kind, tag=tag, platform=platform, problem_id=problem_id, since=since
+        )
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT m.platform, m.problem_id, c.title, c.url, m.tags, m.kind, m.note, "
@@ -218,6 +221,7 @@ class ReviewStore:
         kind: str | None = None,
         tag: str | None = None,
         platform: str | None = None,
+        problem_id: str | None = None,
         since: date | None = None,
     ) -> tuple[str, tuple[str, ...]]:
         clauses: list[str] = []
@@ -231,6 +235,9 @@ class ReviewStore:
         if platform is not None:
             clauses.append("m.platform = ?")
             params.append(platform)
+        if problem_id is not None:
+            clauses.append("m.problem_id = ?")
+            params.append(problem_id)
         if since is not None:
             clauses.append("m.logged_on >= ?")
             params.append(since.isoformat())
