@@ -71,7 +71,7 @@ async def call(server: MCPServer, name: str, **arguments: Any) -> Any:
     return result.structured_content
 
 
-async def test_exposes_the_five_tools(server: MCPServer) -> None:
+async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
     names = {tool.name for tool in await server.list_tools()}
 
     assert names == {
@@ -80,7 +80,19 @@ async def test_exposes_the_five_tools(server: MCPServer) -> None:
         "search_problems",
         "log_review",
         "revisions_due",
+        "mistake_kinds",
+        "list_mistakes",
+        "mistake_patterns",
     }
+
+
+async def test_prompts_only_name_tools_that_exist(server: MCPServer) -> None:
+    tools = {tool.name for tool in await server.list_tools()}
+
+    for prompt in await server.list_prompts():
+        text = (await server.get_prompt(prompt.name, {})).messages[0].content.text
+        named = {word.strip(".,") for word in text.split() if "_" in word}
+        assert named <= tools, (prompt.name, named - tools)
 
 
 async def test_profile_returns_most_recent_submissions_first(server: MCPServer) -> None:
@@ -163,3 +175,53 @@ async def test_overlapping_reviews_each_count(server: MCPServer) -> None:
     card = await call(server, "log_review", **arguments)
 
     assert card["repetitions"] == 4
+
+
+REVIEW = {
+    "platform": "fake",
+    "problem_id": "p0",
+    "title": "P0",
+    "url": "https://example.com/p0",
+    "quality": 2,
+    "tags": ["graph"],
+}
+
+
+async def test_mistakes_logged_with_a_review_feed_the_journal(server: MCPServer) -> None:
+    await call(
+        server,
+        "log_review",
+        **REVIEW,
+        mistakes=[
+            {"kind": "missed empty input", "note": "crashed on []"},
+            {"kind": "wrong traversal", "note": "used DFS where BFS gives shortest path"},
+        ],
+    )
+    await call(
+        server,
+        "log_review",
+        **REVIEW,
+        mistakes=[
+            {"kind": "missed empty input", "note": "again no guard for n = 0"},
+        ],
+    )
+
+    kinds = (await call(server, "mistake_kinds"))["result"]
+    patterns = await call(server, "mistake_patterns")
+    journal = (await call(server, "list_mistakes", kind="missed empty input"))["result"]
+
+    assert [(k["kind"], k["count"]) for k in kinds] == [
+        ("missed empty input", 2),
+        ("wrong traversal", 1),
+    ]
+    assert {"kind": "missed empty input", "key": "graph", "count": 2} in patterns["by_tag"]
+    assert [m["note"] for m in journal] == ["again no guard for n = 0", "crashed on []"]
+    assert journal[0]["title"] == "P0"
+
+
+async def test_a_blank_mistake_is_rejected_and_nothing_is_saved(server: MCPServer) -> None:
+    with pytest.raises(ToolError):
+        await server.call_tool("log_review", {**REVIEW, "mistakes": [{"kind": " ", "note": "x"}]})
+
+    assert (await call(server, "revisions_due"))["result"] == []
+    assert (await call(server, "mistake_kinds"))["result"] == []
