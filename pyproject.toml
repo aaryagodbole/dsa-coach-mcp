@@ -1,0 +1,29 @@
+[project]
+name = "dsa-coach-mcp"
+version = "0.1.0"
+description = "MCP server that coaches DSA practice across LeetCode and Codeforces"
+readme = "README.md"
+authors = [
+    { name = "aaryagodbole", email = "aaryagodbole2005@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=2.3.0",
+    "pydantic>=2.14.1",
+]
+
+[project.scripts]
+dsa-coach-mcp = "dsa_coach_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.2",
+]
