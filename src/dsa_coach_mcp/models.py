@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
+
+NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class Problem(BaseModel):
@@ -52,3 +55,42 @@ class ReviewCard(BaseModel):
     interval_days: int
     repetitions: int
     due: date
+
+
+class Mistake(BaseModel):
+    # The model's own short label for the kind of mistake, reused across reviews so
+    # patterns emerge; there is deliberately no fixed list of kinds.
+    kind: NonBlank
+    # What went wrong, in the user's words.
+    note: NonBlank
+
+
+class MistakeEntry(BaseModel):
+    platform: str
+    problem_id: str
+    title: str
+    url: str
+    tags: list[str]
+    kind: str
+    note: str
+    logged_on: date
+
+
+class MistakeKind(BaseModel):
+    kind: str
+    count: int
+    last_seen: date
+
+
+class MistakeCount(BaseModel):
+    kind: str
+    # The tag, platform or month the count is broken down by.
+    key: str
+    count: int
+
+
+class MistakePatterns(BaseModel):
+    kinds: list[MistakeKind]
+    by_tag: list[MistakeCount]
+    by_platform: list[MistakeCount]
+    by_month: list[MistakeCount]
