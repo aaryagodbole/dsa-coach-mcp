@@ -7,7 +7,8 @@
 An [MCP](https://modelcontextprotocol.io) server that turns your **LeetCode** and
 **Codeforces** history into a DSA coach inside Claude, Cursor or any MCP client:
 see where you stand across platforms, get problems to try next, and revise what you
-solved on a spaced-repetition schedule.
+solved on a spaced-repetition schedule, with a **mistake journal** that remembers
+*why* you got things wrong and builds your next practice set around it.
 
 ```text
 You:    What should I practise this week? I'm alice on LeetCode and bob on Codeforces.
@@ -24,6 +25,10 @@ Practice data is split across sites, and each grades difficulty its own way
 problems; few tell you what you are forgetting. This server puts both platforms
 behind one interface and adds [SM-2](https://super-memory.com/english/ol/sm2.htm)
 revision scheduling, so the model you already talk to can coach you.
+
+Counting solved problems hides the real signal: the same few mistakes, repeated. Every
+review can carry the mistakes behind it, and the model turns those patterns into
+practice sets and revision quizzes aimed at exactly what you keep missing.
 
 ## Design
 
@@ -57,6 +62,31 @@ flowchart LR
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
 | `log_review` | Records how well you recalled a problem (0-5) and schedules the next revision |
 | `revisions_due` | Problems due for revision today or overdue |
+| `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
+| `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
+| `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |
+
+### Prompts
+
+| Prompt | What it does |
+| --- | --- |
+| `practice_plan` | Builds the next practice set from your recurring mistakes and progress |
+| `revision_quiz` | Quizzes you on today's revisions using what you got wrong before |
+
+### Mistake journal
+
+There is no fixed list of mistake types. The model labels each mistake in a few words
+and is shown every label used before, so it reuses yours instead of inventing new ones;
+your journal's vocabulary grows from your own reviews. The server only stores and counts
+them; spotting the pattern is the model's job.
+
+```text
+You:    Redid Course Schedule. Forgot to detect the cycle again, and used DFS recursion
+        that would overflow on 10^5 nodes.
+Claude: (log_review with quality 2 and two mistakes, reusing your existing
+        "missed cycle detection" label)
+        That's the third time cycle detection has slipped on graph problems ...
+```
 
 ## Install
 
