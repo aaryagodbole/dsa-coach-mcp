@@ -19,10 +19,10 @@ def _problem_id(problem: dict[str, Any]) -> str | None:
     return f"{contest}{problem['index']}" if contest is not None else None
 
 
-def _to_problem(problem: dict[str, Any], problem_id: str) -> Problem:
+def _to_problem(platform: str, problem: dict[str, Any], problem_id: str) -> Problem:
     rating = problem.get("rating")
     return Problem(
-        platform="codeforces",
+        platform=platform,
         problem_id=problem_id,
         title=problem["name"],
         url=f"https://codeforces.com/problemset/problem/{problem['contestId']}/{problem['index']}",
@@ -48,9 +48,14 @@ class CodeforcesAdapter:
             raise PlatformError(f"Codeforces {method}: unexpected response {body!r}")
         if body.get("status") != "OK":
             comment = str(body.get("comment") or response.status_code)
-            if "not found" in comment.lower():
-                raise UserNotFoundError(comment)
-            raise PlatformError(f"Codeforces {method}: {comment}")
+            # The API answers a request it cannot serve for its inputs, such as an
+            # unknown handle, with 400; limits and outages come back with other codes.
+            error = (
+                UserNotFoundError
+                if response.status_code == httpx.codes.BAD_REQUEST
+                else PlatformError
+            )
+            raise error(f"Codeforces {method}: {comment}")
         return body["result"]
 
     async def _all_problems(self) -> list[dict[str, Any]]:
@@ -84,7 +89,7 @@ class CodeforcesAdapter:
             accepted = row.get("verdict") == "OK"
             submissions.append(
                 Submission(
-                    problem=_to_problem(row["problem"], problem_id),
+                    problem=_to_problem(self.name, row["problem"], problem_id),
                     accepted=accepted,
                     submitted_at=datetime.fromtimestamp(row["creationTimeSeconds"], tz=UTC),
                 )
@@ -117,7 +122,7 @@ class CodeforcesAdapter:
             problem_id = _problem_id(problem)
             if problem_id is None or not wanted <= set(problem.get("tags") or []):
                 continue
-            candidate = _to_problem(problem, problem_id)
+            candidate = _to_problem(self.name, problem, problem_id)
             if level is not None and candidate.level != level:
                 continue
             found.append(candidate)

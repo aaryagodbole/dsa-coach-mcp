@@ -8,8 +8,6 @@ import pytest
 from dsa_coach_mcp.platforms import PlatformError, UserNotFoundError
 from dsa_coach_mcp.platforms.codeforces import CodeforcesAdapter
 
-from .conftest import mock_client
-
 
 def problem(contest: int, index: str, tags: list[str], rating: int | None) -> dict[str, Any]:
     row: dict[str, Any] = {
@@ -41,14 +39,15 @@ STATUS = [
 
 
 def adapter(results: dict[str, Any]) -> CodeforcesAdapter:
-    def handler(request: httpx.Request) -> dict[str, Any]:
+    def handler(request: httpx.Request) -> httpx.Response:
         method = request.url.path.rsplit("/", 1)[-1]
         result = results[method]
-        if isinstance(result, str):
-            return {"status": "FAILED", "comment": result}
-        return {"status": "OK", "result": result}
+        if isinstance(result, tuple):
+            status, comment = result
+            return httpx.Response(status, json={"status": "FAILED", "comment": comment})
+        return httpx.Response(200, json={"status": "OK", "result": result})
 
-    return CodeforcesAdapter(mock_client(handler))
+    return CodeforcesAdapter(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
 
 
 async def test_describe_collects_tags_and_ratings_from_the_problemset() -> None:
@@ -76,14 +75,14 @@ async def test_unrated_user_has_no_level() -> None:
 
 
 async def test_unknown_handle_raises_not_found() -> None:
-    cf = adapter({"user.info": "handles: User with handle x not found"})
+    cf = adapter({"user.info": (400, "handles: User with handle x not found")})
 
     with pytest.raises(UserNotFoundError):
         await cf.profile("x")
 
 
 async def test_other_failures_raise_platform_error() -> None:
-    cf = adapter({"problemset.problems": "Call limit exceeded"})
+    cf = adapter({"problemset.problems": (503, "Call limit exceeded")})
 
     with pytest.raises(PlatformError, match="Call limit"):
         await cf.describe()
