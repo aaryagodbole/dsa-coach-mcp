@@ -60,9 +60,11 @@ def _difficulties(rows: list[dict[str, Any]]) -> list[str]:
     return [row["difficulty"] for row in rows if not totals or row is not totals[0]]
 
 
-def _is_null_field_error(error: object, data: dict[str, Any]) -> bool:
+def _is_tolerated_null(error: object, data: dict[str, Any], nullable: frozenset[str]) -> bool:
     path = error.get("path") if isinstance(error, dict) else None
-    return isinstance(path, list) and bool(path) and data.get(path[0]) is None
+    return (
+        isinstance(path, list) and bool(path) and path[0] in nullable and data.get(path[0]) is None
+    )
 
 
 class LeetCodeAdapter:
@@ -72,7 +74,16 @@ class LeetCodeAdapter:
         self._client = client
         self._info: PlatformInfo | None = None
 
-    async def _query(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _query(
+        self,
+        query: str,
+        variables: dict[str, Any] | None = None,
+        *,
+        nullable: frozenset[str] = frozenset(),
+    ) -> dict[str, Any]:
+        """Run a query. ``nullable`` names the top-level fields the caller checks for
+        null itself (a lookup that found nothing); an error on any other field raises."""
+
         response = await self._client.post(
             _GRAPHQL_URL, json={"query": query, "variables": variables or {}}, headers=_HEADERS
         )
@@ -84,9 +95,7 @@ class LeetCodeAdapter:
         data = body.get("data") if isinstance(body, dict) else None
         if not isinstance(data, dict):
             raise PlatformError(f"LeetCode returned no data: {body}")
-        # A lookup that finds nothing (an unknown user) comes back as an error on a field
-        # that is null; callers check for that null. Any other error is a real failure.
-        errors = [e for e in body.get("errors") or [] if not _is_null_field_error(e, data)]
+        errors = [e for e in body.get("errors") or [] if not _is_tolerated_null(e, data, nullable)]
         if errors:
             raise PlatformError(f"LeetCode query failed: {errors}")
         return data
@@ -104,7 +113,12 @@ class LeetCodeAdapter:
 
     async def profile(self, handle: str) -> Profile:
         levels = (await self.describe()).levels
-        data = await self._query(_PROFILE_QUERY, {"username": handle, "limit": _RECENT_LIMIT})
+        # An unknown user comes back as an error on a null matchedUser, checked below.
+        data = await self._query(
+            _PROFILE_QUERY,
+            {"username": handle, "limit": _RECENT_LIMIT},
+            nullable=frozenset({"matchedUser"}),
+        )
         user = data.get("matchedUser")
         if user is None:
             raise UserNotFoundError(f"LeetCode user '{handle}' not found")

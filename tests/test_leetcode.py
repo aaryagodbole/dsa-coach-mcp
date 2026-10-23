@@ -149,3 +149,15 @@ async def test_search_pages_past_paid_problems_to_fill_the_limit() -> None:
 
     assert [p.problem_id for p in found] == ["free"]
     assert [b["variables"]["skip"] for b in seen] == [0, 2]
+
+
+async def test_a_failed_search_is_a_platform_error_not_a_crash() -> None:
+    adapter = adapter_with_body(
+        {
+            "data": {"questionList": None},
+            "errors": [{"message": "Internal error", "path": ["questionList"]}],
+        }
+    )
+
+    with pytest.raises(PlatformError, match="Internal error"):
+        await adapter.search([], None, limit=5)
