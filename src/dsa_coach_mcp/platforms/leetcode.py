@@ -37,8 +37,8 @@ _DESCRIBE_QUERY = """
 """
 
 _SEARCH_QUERY = """
-query search($filters: QuestionListFilterInput, $limit: Int!) {
-  questionList(categorySlug: "", limit: $limit, skip: 0, filters: $filters) {
+query search($filters: QuestionListFilterInput, $limit: Int!, $skip: Int!) {
+  questionList(categorySlug: "", limit: $limit, skip: $skip, filters: $filters) {
     data { title titleSlug difficulty isPaidOnly topicTags { slug } }
   }
 }
@@ -60,6 +60,11 @@ def _difficulties(rows: list[dict[str, Any]]) -> list[str]:
     return [row["difficulty"] for row in rows if not totals or row is not totals[0]]
 
 
+def _is_null_field_error(error: object, data: dict[str, Any]) -> bool:
+    path = error.get("path") if isinstance(error, dict) else None
+    return isinstance(path, list) and bool(path) and data.get(path[0]) is None
+
+
 class LeetCodeAdapter:
     name = "leetcode"
 
@@ -72,10 +77,18 @@ class LeetCodeAdapter:
             _GRAPHQL_URL, json={"query": query, "variables": variables or {}}, headers=_HEADERS
         )
         response.raise_for_status()
-        body = response.json()
-        data = body.get("data")
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise PlatformError("LeetCode returned a non-JSON response") from exc
+        data = body.get("data") if isinstance(body, dict) else None
         if not isinstance(data, dict):
-            raise PlatformError(f"LeetCode returned no data: {body.get('errors')}")
+            raise PlatformError(f"LeetCode returned no data: {body}")
+        # A lookup that finds nothing (an unknown user) comes back as an error on a field
+        # that is null; callers check for that null. Any other error is a real failure.
+        errors = [e for e in body.get("errors") or [] if not _is_null_field_error(e, data)]
+        if errors:
+            raise PlatformError(f"LeetCode query failed: {errors}")
         return data
 
     async def describe(self) -> PlatformInfo:
@@ -138,16 +151,28 @@ class LeetCodeAdapter:
         if level:
             # The filter takes the difficulty as an enum constant, not as it is displayed.
             filters["difficulty"] = level.upper()
-        data = await self._query(_SEARCH_QUERY, {"filters": filters, "limit": limit})
-        return [
-            Problem(
-                platform=self.name,
-                problem_id=row["titleSlug"],
-                title=row["title"],
-                url=_problem_url(row["titleSlug"]),
-                tags=[tag["slug"] for tag in row["topicTags"]],
-                level=row["difficulty"],
+        found: list[Problem] = []
+        skip = 0
+        # Paid-only problems are dropped after the page comes back, so keep paging
+        # until the free ones fill the request or the catalog runs out.
+        while len(found) < limit:
+            data = await self._query(
+                _SEARCH_QUERY, {"filters": filters, "limit": limit, "skip": skip}
             )
-            for row in data["questionList"]["data"]
-            if not row["isPaidOnly"]
-        ]
+            rows = data["questionList"]["data"]
+            found.extend(
+                Problem(
+                    platform=self.name,
+                    problem_id=row["titleSlug"],
+                    title=row["title"],
+                    url=_problem_url(row["titleSlug"]),
+                    tags=[tag["slug"] for tag in row["topicTags"]],
+                    level=row["difficulty"],
+                )
+                for row in rows
+                if not row["isPaidOnly"]
+            )
+            if len(rows) < limit:
+                break
+            skip += len(rows)
+        return found[:limit]

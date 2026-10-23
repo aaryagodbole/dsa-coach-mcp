@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import pytest
 
-from dsa_coach_mcp.platforms import UserNotFoundError
+from dsa_coach_mcp.platforms import PlatformError, UserNotFoundError
 from dsa_coach_mcp.platforms.leetcode import LeetCodeAdapter
 
 from .conftest import graphql_body, mock_client
@@ -71,11 +71,34 @@ async def test_profile_keeps_levels_even_when_every_count_is_zero() -> None:
     assert profile.limitations
 
 
-async def test_unknown_user_raises() -> None:
-    adapter = adapter_answering({"matchedUser": None, "recentAcSubmissionList": None}, [])
+def adapter_with_body(body: dict[str, Any]) -> LeetCodeAdapter:
+    def handler(request: httpx.Request) -> dict[str, Any]:
+        if "allQuestionsCount" in graphql_body(request)["query"]:
+            return {"data": CATALOG}
+        return body
+
+    return LeetCodeAdapter(mock_client(handler))
+
+
+async def test_unknown_user_raises_not_found() -> None:
+    adapter = adapter_with_body(
+        {
+            "data": {"matchedUser": None, "recentAcSubmissionList": None},
+            "errors": [{"message": "That user does not exist.", "path": ["matchedUser"]}],
+        }
+    )
 
     with pytest.raises(UserNotFoundError):
         await adapter.profile("nobody")
+
+
+async def test_other_graphql_errors_are_platform_errors() -> None:
+    adapter = adapter_with_body(
+        {"data": {"questionList": None}, "errors": [{"message": "Query unavailable"}]}
+    )
+
+    with pytest.raises(PlatformError, match="Query unavailable"):
+        await adapter.search([], None, limit=5)
 
 
 async def test_search_sends_the_enum_spelling_and_drops_paid_problems() -> None:
@@ -102,3 +125,27 @@ async def test_search_sends_the_enum_spelling_and_drops_paid_problems() -> None:
 
     assert [p.problem_id for p in found] == ["free"]
     assert seen[-1]["variables"]["filters"] == {"tags": ["graph"], "difficulty": "MEDIUM"}
+
+
+async def test_search_pages_past_paid_problems_to_fill_the_limit() -> None:
+    def row(slug: str, paid: bool) -> dict[str, Any]:
+        return {
+            "title": slug,
+            "titleSlug": slug,
+            "difficulty": "Easy",
+            "isPaidOnly": paid,
+            "topicTags": [],
+        }
+
+    pages = {0: [row("paid-1", True), row("paid-2", True)], 2: [row("free", False)]}
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> dict[str, Any]:
+        body = graphql_body(request)
+        seen.append(body)
+        return {"data": {"questionList": {"data": pages[body["variables"]["skip"]]}}}
+
+    found = await LeetCodeAdapter(mock_client(handler)).search([], None, limit=2)
+
+    assert [p.problem_id for p in found] == ["free"]
+    assert [b["variables"]["skip"] for b in seen] == [0, 2]

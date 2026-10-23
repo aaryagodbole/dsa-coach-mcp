@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -129,3 +130,36 @@ async def test_logged_review_is_due_after_its_interval(server: MCPServer) -> Non
 
     assert card["due"] == "2026-01-02"
     assert (await call(server, "revisions_due"))["result"] == []
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"problem_id": "  "}, {"title": ""}, {"url": "not a url"}, {"url": "ftp://x/y"}],
+)
+async def test_log_review_rejects_unusable_cards(server: MCPServer, bad: dict[str, str]) -> None:
+    arguments = {
+        "platform": "fake",
+        "problem_id": "p0",
+        "title": "P0",
+        "url": "https://example.com/p0",
+        "quality": 5,
+        **bad,
+    }
+
+    with pytest.raises(ToolError):
+        await server.call_tool("log_review", arguments)
+
+
+async def test_overlapping_reviews_each_count(server: MCPServer) -> None:
+    arguments = {
+        "platform": "fake",
+        "problem_id": "p0",
+        "title": "P0",
+        "url": "https://example.com/p0",
+        "quality": 5,
+    }
+
+    await asyncio.gather(*(server.call_tool("log_review", arguments) for _ in range(3)))
+    card = await call(server, "log_review", **arguments)
+
+    assert card["repetitions"] == 4

@@ -40,7 +40,12 @@ class CodeforcesAdapter:
 
     async def _call(self, method: str, params: dict[str, str]) -> Any:
         response = await self._client.get(f"{_API_URL}/{method}", params=params)
-        body = response.json()
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise PlatformError(f"Codeforces {method}: non-JSON response") from exc
+        if not isinstance(body, dict):
+            raise PlatformError(f"Codeforces {method}: unexpected response {body!r}")
         if body.get("status") != "OK":
             comment = str(body.get("comment") or response.status_code)
             if "not found" in comment.lower():

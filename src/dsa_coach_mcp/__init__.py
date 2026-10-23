@@ -20,7 +20,8 @@ async def _serve() -> None:
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(20.0), headers={"User-Agent": _USER_AGENT}
     ) as client:
-        server = create_server(build_adapters(client), ReviewStore(default_db_path()))
+        store = await asyncio.to_thread(ReviewStore, default_db_path())
+        server = create_server(build_adapters(client), store)
         await server.run_stdio_async()
 
 

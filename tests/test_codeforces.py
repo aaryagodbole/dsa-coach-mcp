@@ -95,3 +95,12 @@ async def test_search_needs_every_tag_and_the_exact_level() -> None:
     assert [p.problem_id for p in await cf.search(["graphs"], None, 10)] == ["1B", "2A"]
     assert [p.problem_id for p in await cf.search(["dp", "graphs"], "1600", 10)] == ["1B"]
     assert await cf.search(["graphs"], "800", 10) == []
+
+
+async def test_a_body_that_is_not_an_object_is_a_platform_error() -> None:
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[]))
+    )
+
+    with pytest.raises(PlatformError, match="unexpected response"):
+        await CodeforcesAdapter(client).describe()

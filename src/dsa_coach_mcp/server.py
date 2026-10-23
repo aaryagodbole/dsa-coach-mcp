@@ -13,7 +13,7 @@ import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import AnyHttpUrl, Field, StringConstraints
 
 from . import srs
 from .models import PlatformInfo, Problem, Profile, ReviewCard
@@ -26,6 +26,8 @@ Call list_platforms first to learn each platform's tags and levels, get_profile 
 where the user stands, and search_problems with filters you chose from that data.
 After the user solves or revisits a problem, record how well they recalled it with
 log_review; revisions_due lists what to revise today."""
+
+_NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 _READ_REMOTE = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 _READ_LOCAL = ToolAnnotations(read_only_hint=True, open_world_hint=False)
@@ -52,6 +54,9 @@ def create_server(
     today: Callable[[], date] = date.today,
 ) -> MCPServer:
     server = MCPServer(name="dsa-coach", instructions=_INSTRUCTIONS)
+    # Read, reschedule and write one card at a time, so overlapping reviews never
+    # both start from the same previous schedule.
+    review_lock = asyncio.Lock()
 
     def adapter_for(platform: str) -> PlatformAdapter:
         adapter = adapters.get(platform)
@@ -111,34 +116,37 @@ def create_server(
     @server.tool(annotations=_WRITE_LOCAL)
     async def log_review(
         platform: str,
-        problem_id: str,
-        title: str,
-        url: str,
+        problem_id: _NonBlank,
+        title: _NonBlank,
+        url: AnyHttpUrl,
         quality: Annotated[int, Field(ge=srs.MIN_QUALITY, le=srs.MAX_QUALITY)],
     ) -> ReviewCard:
         """Record how well the user recalled a problem (0 = could not, 5 = instantly) and
         schedule the next revision."""
 
         adapter_for(platform)
-        previous = await asyncio.to_thread(store.get, platform, problem_id)
-        schedule = srs.review(
-            srs.Schedule(previous.ease, previous.interval_days, previous.repetitions, previous.due)
-            if previous
-            else None,
-            quality,
-            today(),
-        )
-        card = ReviewCard(
-            platform=platform,
-            problem_id=problem_id,
-            title=title,
-            url=url,
-            ease=schedule.ease,
-            interval_days=schedule.interval_days,
-            repetitions=schedule.repetitions,
-            due=schedule.due,
-        )
-        await asyncio.to_thread(store.save, card)
+        async with review_lock:
+            previous = await asyncio.to_thread(store.get, platform, problem_id)
+            schedule = srs.review(
+                srs.Schedule(
+                    previous.ease, previous.interval_days, previous.repetitions, previous.due
+                )
+                if previous
+                else None,
+                quality,
+                today(),
+            )
+            card = ReviewCard(
+                platform=platform,
+                problem_id=problem_id,
+                title=title,
+                url=str(url),
+                ease=schedule.ease,
+                interval_days=schedule.interval_days,
+                repetitions=schedule.repetitions,
+                due=schedule.due,
+            )
+            await asyncio.to_thread(store.save, card)
         return card
 
     @server.tool(annotations=_READ_LOCAL)
