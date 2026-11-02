@@ -74,6 +74,8 @@ flowchart LR
 | `revisions_due` | Problems due now, the one you are least likely to remember first, each with FSRS's recall estimate |
 | `schedule_info` | The FSRS parameters in use, whether they are personalised, and how many reviews are logged |
 | `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
+| `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |
+| `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
 | `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |
@@ -84,6 +86,29 @@ flowchart LR
 | --- | --- |
 | `practice_plan` | Builds the next practice set from your recurring mistakes and progress |
 | `revision_quiz` | Quizzes you on today's revisions using what you got wrong before |
+
+### Any platform
+
+LeetCode and Codeforces have adapters that read from their APIs. Every other platform
+works through the page you are looking at: pair this server with a browser MCP server
+such as [Playwright MCP](https://github.com/microsoft/playwright-mcp) in extension mode,
+which lets the model read the tab open in your own browser, logged in. The model reads
+the problem page and calls `record_problem` with its URL, title, tags and difficulty;
+from then on it is reviewed, scheduled and journaled like any other problem.
+
+```json
+{
+  "mcpServers": {
+    "dsa-coach": { "command": "uvx", "args": ["dsa-coach-mcp"] },
+    "playwright": { "command": "npx", "args": ["@playwright/mcp@latest", "--extension"] }
+  }
+}
+```
+
+No platform is listed in the code: the platform is the problem URL's host, and its
+problem id is the URL's path. Problems recorded this way are marked
+`"source": "reported"`, because they come from a page the model read rather than from
+the platform's API, and a host that has an adapter is always sent to its adapter.
 
 ### Mistake journal
 

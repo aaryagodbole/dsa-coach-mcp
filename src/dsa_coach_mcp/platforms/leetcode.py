@@ -76,6 +76,7 @@ def _is_tolerated_null(error: object, data: dict[str, Any], nullable: frozenset[
 
 class LeetCodeAdapter:
     name = "leetcode"
+    hosts: tuple[str, ...] = ("leetcode.com",)
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client

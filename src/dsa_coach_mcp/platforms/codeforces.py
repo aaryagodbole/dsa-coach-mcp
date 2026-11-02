@@ -33,6 +33,7 @@ def _to_problem(platform: str, problem: dict[str, Any], problem_id: str) -> Prob
 
 class CodeforcesAdapter:
     name = "codeforces"
+    hosts: tuple[str, ...] = ("codeforces.com",)
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client

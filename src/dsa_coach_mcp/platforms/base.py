@@ -23,6 +23,8 @@ class PlatformAdapter(Protocol):
     judgement: which topic is weak or which problem comes next is the caller's call."""
 
     name: str
+    # The web hosts this platform's problems live on.
+    hosts: tuple[str, ...]
 
     async def describe(self) -> PlatformInfo: ...
 
