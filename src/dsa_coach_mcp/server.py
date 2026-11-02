@@ -418,11 +418,12 @@ def create_server(
 
         at = now()
         rows = await asyncio.to_thread(store.progress, at)
-        records = await asyncio.to_thread(store.due, at, limit)
+        fsrs = await scheduler()
+        records = await asyncio.to_thread(store.due, at)
         due = sorted(
-            (to_card(record, at) for record in records),
+            (to_card(record, at, fsrs) for record in records),
             key=lambda c: (c.retrievability is not None, c.retrievability),
-        )
+        )[:limit]
         return Dashboard(
             progress=[
                 PlatformProgress(
