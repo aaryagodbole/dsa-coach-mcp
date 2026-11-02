@@ -10,13 +10,10 @@ see where you stand across platforms, get problems to try next, and revise what 
 solved on a spaced-repetition schedule, with a **mistake journal** that remembers
 *why* you got things wrong and builds your next practice set around it.
 
-```text
-You:    What should I practise this week? I'm alice on LeetCode and bob on Codeforces.
-Claude: (get_profile x2, search_problems)
-        Your graph work is thin on both sites: 1 LeetCode graph problem, and 3
-        Codeforces graph problems attempted but never accepted. Here are four
-        Medium / 1400-rated graph problems you haven't solved yet ...
-```
+<p align="center">
+  <img src="docs/demo.svg" alt="dsa-coach-mcp driven over stdio on live LeetCode and Codeforces data" width="820">
+</p>
+<p align="center"><sub>A real session, recorded by <a href="examples/demo.py"><code>examples/demo.py</code></a>: it starts the server over stdio and calls its tools on live data.</sub></p>
 
 ## Why
 
@@ -145,6 +142,12 @@ uv run pre-commit install
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
+```
+
+Re-record the demo at the top of this page against live data:
+
+```bash
+uv run python examples/demo.py --leetcode <username> --codeforces <handle>
 ```
 
 Tests never hit the network: adapters are tested against mocked API responses. See
