@@ -75,6 +75,11 @@ async def run(leetcode: str, codeforces: str, db: Path) -> None:
             )
         console.print(table)
 
+        if not lc["solved_by_tag"] or not lc["level_summary"]:
+            raise SystemExit(
+                f"LeetCode user {leetcode!r} has no solved tags or levels yet; "
+                "the demo needs a profile with some history."
+            )
         thin_tag = min(lc["solved_by_tag"].items(), key=lambda kv: kv[1])[0]
         level = sorted(lc["level_summary"].items(), key=lambda kv: -kv[1])[0][0]
         problems = await call(
@@ -89,6 +94,8 @@ async def run(leetcode: str, codeforces: str, db: Path) -> None:
         for p in problems:
             console.print(f"   [green]●[/] {p['title']} [dim]({p['level']}) {p['url']}[/]")
 
+        if not problems:
+            raise SystemExit(f"No unsolved {level} problems tagged {thin_tag!r} to demo with.")
         problem = problems[0]
         console.print("\n[dim]# The user retries it and the model journals what went wrong:[/]")
         await call(
