@@ -87,3 +87,14 @@ def test_patterns_and_kinds_respect_since(tmp_path: Path) -> None:
     assert [(c.key, c.count) for c in patterns.by_tag] == [("graph", 1)]
     assert [(c.key, c.count) for c in patterns.by_month] == [("2026-03", 1)]
     assert [m.note for m in store.mistakes(tag="dp", limit=10)] == ["old"]
+
+
+def test_patterns_count_every_tag_by_name_not_by_position(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+    mistake = [Mistake(kind="missed cycle", note="n")]
+    store.record_review(card("a", date(2026, 1, 2)), ["graph", "bfs"], mistake, date(2026, 1, 1))
+    store.record_review(card("b", date(2026, 1, 2)), ["dfs", "graph"], mistake, date(2026, 1, 1))
+
+    counts = {c.key: c.count for c in store.patterns().by_tag}
+
+    assert counts == {"graph": 2, "bfs": 1, "dfs": 1}

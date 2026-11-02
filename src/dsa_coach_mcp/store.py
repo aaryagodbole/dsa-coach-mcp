@@ -199,11 +199,17 @@ class ReviewStore:
 
             def counts(key_sql: str, source: str) -> list[MistakeCount]:
                 rows = conn.execute(
-                    f"SELECT m.kind AS kind, {key_sql} AS key, COUNT(*) AS count "
-                    f"FROM {source} {where} GROUP BY m.kind, key ORDER BY count DESC, kind, key",
+                    # Not aliased "key": json_each has its own key column (the array
+                    # index), which GROUP BY would pick instead of the alias.
+                    f"SELECT m.kind AS kind, {key_sql} AS bucket, COUNT(*) AS count "
+                    f"FROM {source} {where} GROUP BY m.kind, bucket "
+                    "ORDER BY count DESC, kind, bucket",
                     params,
                 ).fetchall()
-                return [MistakeCount(**dict(row)) for row in rows]
+                return [
+                    MistakeCount(kind=row["kind"], key=row["bucket"], count=row["count"])
+                    for row in rows
+                ]
 
             by_tag = counts("t.value", "mistakes m, json_each(m.tags) t")
             by_platform = counts("m.platform", "mistakes m")
