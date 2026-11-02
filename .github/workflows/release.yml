@@ -65,7 +65,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {f=1; next} f && /^## \[/ {exit} f' CHANGELOG.md > notes.md
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {f=1; next} f && /^(## )?\[[^]]+\]/ {exit} f' CHANGELOG.md > notes.md
           if ! grep -q '[^[:space:]]' notes.md; then
             echo "CHANGELOG.md has no notes under ## [$version]" >&2
             exit 1

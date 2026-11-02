@@ -1,6 +1,7 @@
 # dsa-coach-mcp
 
 [![CI](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/dsa-coach-mcp.svg)](https://pypi.org/project/dsa-coach-mcp/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -98,7 +99,7 @@ Requires [uv](https://docs.astral.sh/uv/).
   "mcpServers": {
     "dsa-coach": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/aaryagodbole/dsa-coach-mcp", "dsa-coach-mcp"]
+      "args": ["dsa-coach-mcp"]
     }
   }
 }
@@ -107,7 +108,7 @@ Requires [uv](https://docs.astral.sh/uv/).
 **Claude Code**:
 
 ```bash
-claude mcp add dsa-coach -- uvx --from git+https://github.com/aaryagodbole/dsa-coach-mcp dsa-coach-mcp
+claude mcp add dsa-coach -- uvx dsa-coach-mcp
 ```
 
 **Cursor**: same `command` and `args` as above in `.cursor/mcp.json`.
