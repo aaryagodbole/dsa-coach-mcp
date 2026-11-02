@@ -116,3 +116,9 @@ class MistakePatterns(BaseModel):
     by_tag: list[MistakeCount]
     by_platform: list[MistakeCount]
     by_month: list[MistakeCount]
+
+
+class Dashboard(BaseModel):
+    progress: list[PlatformProgress]
+    due: list[ReviewCard]
+    patterns: MistakePatterns

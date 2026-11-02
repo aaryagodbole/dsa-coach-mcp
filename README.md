@@ -76,6 +76,7 @@ flowchart LR
 | `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
 | `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |
 | `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
+| `show_dashboard` | Progress, revisions due by risk of forgetting, and a mistake heatmap, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
 | `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |
@@ -86,6 +87,20 @@ flowchart LR
 | --- | --- |
 | `practice_plan` | Builds the next practice set from your recurring mistakes and progress |
 | `revision_quiz` | Quizzes you on today's revisions using what you got wrong before |
+
+### Dashboard
+
+`show_dashboard` is an [MCP App](https://modelcontextprotocol.io/docs/extensions/apps):
+hosts that support them (Claude, Claude Desktop, VS Code Copilot, Goose and others) render
+it inside the conversation; every other host gets the same data as the tool's result.
+The view is one self-contained HTML file with no external scripts, follows the host's
+light or dark theme, and talks to the host over the MCP Apps postMessage protocol.
+
+<p align="center">
+  <img src="docs/dashboard-dark.png" alt="dsa-coach dashboard, dark theme" width="49%">
+  <img src="docs/dashboard-light.png" alt="dsa-coach dashboard, light theme" width="49%">
+</p>
+<p align="center"><sub>Rendered from sample data by <a href="examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol.</sub></p>
 
 ### Any platform
 
