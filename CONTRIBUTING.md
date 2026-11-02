@@ -36,11 +36,15 @@ uv run pre-commit install
 Releases publish to PyPI through [trusted publishing](https://docs.pypi.org/trusted-publishers/),
 so no API token is stored anywhere.
 
-1. Bump `version` in `pyproject.toml` and move the `Unreleased` changelog entries under a
+1. Once per project, before the first release: the PyPI owner adds a trusted publisher
+   for `dsa-coach-mcp` (repository `aaryagodbole/dsa-coach-mcp`, workflow `release.yml`,
+   environment `pypi`) at pypi.org → Publishing. The `pypi` GitHub environment only
+   accepts `v*` tags.
+2. Bump `version` in `pyproject.toml` and move the `Unreleased` changelog entries under a
    new `## [x.y.z] - YYYY-MM-DD` heading, in a pull request.
-2. After it merges, tag `main` and push the tag:
+3. After it merges, tag `main` and push the tag:
    ```bash
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. The release workflow checks the tag matches the package version, runs the tests,
+4. The release workflow checks the tag matches the package version, runs the tests,
    builds, publishes to PyPI, and creates the GitHub release from the changelog entry.
