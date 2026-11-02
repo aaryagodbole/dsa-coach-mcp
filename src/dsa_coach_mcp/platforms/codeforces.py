@@ -131,7 +131,17 @@ class CodeforcesAdapter:
         return found
 
     async def problem(self, problem_id: str) -> Problem:
-        for problem in await self._all_problems():
+        found = self._find(await self._all_problems(), problem_id)
+        if found is None:
+            # The cached problemset predates any problem added since; refetch once.
+            self._problemset = None
+            found = self._find(await self._all_problems(), problem_id)
+        if found is None:
+            raise ProblemNotFoundError(f"Codeforces problem '{problem_id}' not found")
+        return found
+
+    def _find(self, problems: list[dict[str, Any]], problem_id: str) -> Problem | None:
+        for problem in problems:
             if _problem_id(problem) == problem_id:
                 return _to_problem(self.name, problem, problem_id)
-        raise ProblemNotFoundError(f"Codeforces problem '{problem_id}' not found")
+        return None

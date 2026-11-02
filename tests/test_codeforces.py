@@ -111,3 +111,16 @@ async def test_problem_is_looked_up_in_the_problemset() -> None:
     assert (await cf.problem("1B")).tags == ["dp", "graphs"]
     with pytest.raises(ProblemNotFoundError):
         await cf.problem("9Z")
+
+
+async def test_a_problem_added_after_the_cache_is_found_on_refetch() -> None:
+    added = problem(9, "Z", ["dp"], 1200)
+    pages = [{"problems": PROBLEMSET}, {"problems": [*PROBLEMSET, added]}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"status": "OK", "result": pages.pop(0)})
+
+    cf = CodeforcesAdapter(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    await cf.describe()
+
+    assert (await cf.problem("9Z")).title == "P9Z"
