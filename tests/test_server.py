@@ -11,7 +11,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult
 
 from dsa_coach_mcp.models import PlatformInfo, Problem, Profile, Submission
-from dsa_coach_mcp.platforms import UserNotFoundError
+from dsa_coach_mcp.platforms import ProblemNotFoundError, UserNotFoundError
 from dsa_coach_mcp.server import create_server
 from dsa_coach_mcp.store import ReviewStore
 
@@ -33,7 +33,10 @@ class FakeAdapter:
     name = "fake"
 
     def __init__(self) -> None:
-        self.problems = [make_problem(f"p{i}", ["graph"]) for i in range(5)]
+        # The last problem carries a tag the platform's own tag list leaves out, as
+        # LeetCode's does.
+        self.problems = [make_problem(f"p{i}", ["graph"]) for i in range(4)]
+        self.problems.append(make_problem("p4", ["graph", "unlisted"]))
 
     async def describe(self) -> PlatformInfo:
         return PlatformInfo(name=self.name, tags=["graph"], levels=["easy"])
@@ -54,7 +57,13 @@ class FakeAdapter:
         )
 
     async def search(self, tags: list[str], level: str | None, limit: int) -> list[Problem]:
-        return self.problems[:limit]
+        return [p for p in self.problems if set(tags) <= set(p.tags)][:limit]
+
+    async def problem(self, problem_id: str) -> Problem:
+        for problem in self.problems:
+            if problem.problem_id == problem_id:
+                return problem
+        raise ProblemNotFoundError(f"fake problem '{problem_id}' not found")
 
 
 @pytest.fixture
@@ -114,7 +123,7 @@ async def test_search_skips_problems_the_handle_solved(server: MCPServer) -> Non
     ("arguments", "message"),
     [
         ({"platform": "nope"}, "Unknown platform"),
-        ({"platform": "fake", "tags": ["dp"]}, "Unknown fake tags"),
+        ({"platform": "fake", "tags": ["dp"]}, "not in its tag list"),
         ({"platform": "fake", "level": "hard"}, "Unknown fake level"),
     ],
 )
@@ -125,52 +134,39 @@ async def test_search_rejects_values_the_platform_does_not_offer(
         await server.call_tool("search_problems", arguments)
 
 
+async def test_a_tag_missing_from_the_platform_list_still_searches(server: MCPServer) -> None:
+    found = await call(server, "search_problems", platform="fake", tags=["unlisted"])
+
+    assert [p["problem_id"] for p in found["result"]] == ["p4"]
+
+
 async def test_platform_failures_reach_the_model_as_tool_errors(server: MCPServer) -> None:
     with pytest.raises(ToolError, match="not found"):
         await server.call_tool("get_profile", {"platform": "fake", "handle": "ghost"})
 
 
 async def test_logged_review_is_due_after_its_interval(server: MCPServer) -> None:
-    card = await call(
-        server,
-        "log_review",
-        platform="fake",
-        problem_id="p0",
-        title="P0",
-        url="https://example.com/p0",
-        quality=5,
-    )
+    card = await call(server, "log_review", platform="fake", problem_id="p0", quality=5)
 
     assert card["due"] == "2026-01-02"
+    assert (card["title"], card["url"]) == ("p0", "https://example.com/p0")
     assert (await call(server, "revisions_due"))["result"] == []
 
 
-@pytest.mark.parametrize(
-    "bad",
-    [{"problem_id": "  "}, {"title": ""}, {"url": "not a url"}, {"url": "ftp://x/y"}],
-)
-async def test_log_review_rejects_unusable_cards(server: MCPServer, bad: dict[str, str]) -> None:
-    arguments = {
-        "platform": "fake",
-        "problem_id": "p0",
-        "title": "P0",
-        "url": "https://example.com/p0",
-        "quality": 5,
-        **bad,
-    }
-
+@pytest.mark.parametrize("problem_id", ["  ", "no-such-problem"])
+async def test_log_review_needs_a_problem_the_platform_has(
+    server: MCPServer, problem_id: str
+) -> None:
     with pytest.raises(ToolError):
-        await server.call_tool("log_review", arguments)
+        await server.call_tool(
+            "log_review", {"platform": "fake", "problem_id": problem_id, "quality": 5}
+        )
+
+    assert (await call(server, "revisions_due", limit=10))["result"] == []
 
 
 async def test_overlapping_reviews_each_count(server: MCPServer) -> None:
-    arguments = {
-        "platform": "fake",
-        "problem_id": "p0",
-        "title": "P0",
-        "url": "https://example.com/p0",
-        "quality": 5,
-    }
+    arguments = {"platform": "fake", "problem_id": "p0", "quality": 5}
 
     await asyncio.gather(*(server.call_tool("log_review", arguments) for _ in range(3)))
     card = await call(server, "log_review", **arguments)
@@ -178,14 +174,7 @@ async def test_overlapping_reviews_each_count(server: MCPServer) -> None:
     assert card["repetitions"] == 4
 
 
-REVIEW = {
-    "platform": "fake",
-    "problem_id": "p0",
-    "title": "P0",
-    "url": "https://example.com/p0",
-    "quality": 2,
-    "tags": ["graph"],
-}
+REVIEW = {"platform": "fake", "problem_id": "p0", "quality": 2}
 
 
 async def test_mistakes_logged_with_a_review_feed_the_journal(server: MCPServer) -> None:
@@ -217,7 +206,7 @@ async def test_mistakes_logged_with_a_review_feed_the_journal(server: MCPServer)
     ]
     assert {"kind": "missed empty input", "key": "graph", "count": 2} in patterns["by_tag"]
     assert [m["note"] for m in journal] == ["again no guard for n = 0", "crashed on []"]
-    assert journal[0]["title"] == "P0"
+    assert journal[0]["title"] == "p0"
 
 
 async def test_a_blank_mistake_is_rejected_and_nothing_is_saved(server: MCPServer) -> None:
@@ -228,9 +217,17 @@ async def test_a_blank_mistake_is_rejected_and_nothing_is_saved(server: MCPServe
     assert (await call(server, "mistake_kinds"))["result"] == []
 
 
-async def test_review_tags_must_come_from_the_platform(server: MCPServer) -> None:
-    with pytest.raises(ToolError, match="Unknown fake tags"):
-        await server.call_tool("log_review", {**REVIEW, "tags": ["made-up"]})
+async def test_journal_tags_are_the_platform_tags_of_the_problem(server: MCPServer) -> None:
+    await call(
+        server,
+        "log_review",
+        **{**REVIEW, "problem_id": "p4"},
+        mistakes=[{"kind": "k", "note": "n"}],
+    )
+
+    journal = (await call(server, "list_mistakes"))["result"]
+
+    assert journal[0]["tags"] == ["graph", "unlisted"]
 
 
 async def test_a_huge_lookback_means_all_time(server: MCPServer) -> None:
@@ -248,7 +245,7 @@ async def test_mistakes_can_be_read_for_one_problem(server: MCPServer) -> None:
     await call(
         server,
         "log_review",
-        **{**REVIEW, "problem_id": "p1", "title": "P1", "url": "https://example.com/p1"},
+        **{**REVIEW, "problem_id": "p1"},
         mistakes=[{"kind": "k", "note": "on p1"}],
     )
 

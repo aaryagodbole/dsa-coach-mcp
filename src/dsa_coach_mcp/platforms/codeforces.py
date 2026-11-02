@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from ..models import PlatformInfo, Problem, Profile, Submission
-from .base import PlatformError, UserNotFoundError
+from .base import PlatformError, ProblemNotFoundError, UserNotFoundError
 
 _API_URL = "https://codeforces.com/api"
 # The user.info fields that describe skill; the rest (avatar, contribution, ...) do not.
@@ -129,3 +129,9 @@ class CodeforcesAdapter:
             if len(found) >= limit:
                 break
         return found
+
+    async def problem(self, problem_id: str) -> Problem:
+        for problem in await self._all_problems():
+            if _problem_id(problem) == problem_id:
+                return _to_problem(self.name, problem, problem_id)
+        raise ProblemNotFoundError(f"Codeforces problem '{problem_id}' not found")

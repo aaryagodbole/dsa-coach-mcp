@@ -13,6 +13,10 @@ class UserNotFoundError(PlatformError):
     pass
 
 
+class ProblemNotFoundError(PlatformError):
+    pass
+
+
 @runtime_checkable
 class PlatformAdapter(Protocol):
     """Translates one platform's API into the shared models. Adapters hold no
@@ -25,3 +29,7 @@ class PlatformAdapter(Protocol):
     async def profile(self, handle: str) -> Profile: ...
 
     async def search(self, tags: list[str], level: str | None, limit: int) -> list[Problem]: ...
+
+    async def problem(self, problem_id: str) -> Problem:
+        """The problem as the platform describes it; ProblemNotFoundError if it has none."""
+        ...

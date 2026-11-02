@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import pytest
 
-from dsa_coach_mcp.platforms import PlatformError, UserNotFoundError
+from dsa_coach_mcp.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
 from dsa_coach_mcp.platforms.codeforces import CodeforcesAdapter
 
 
@@ -103,3 +103,11 @@ async def test_a_body_that_is_not_an_object_is_a_platform_error() -> None:
 
     with pytest.raises(PlatformError, match="unexpected response"):
         await CodeforcesAdapter(client).describe()
+
+
+async def test_problem_is_looked_up_in_the_problemset() -> None:
+    cf = adapter({"problemset.problems": {"problems": PROBLEMSET}})
+
+    assert (await cf.problem("1B")).tags == ["dp", "graphs"]
+    with pytest.raises(ProblemNotFoundError):
+        await cf.problem("9Z")

@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import pytest
 
-from dsa_coach_mcp.platforms import PlatformError, UserNotFoundError
+from dsa_coach_mcp.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
 from dsa_coach_mcp.platforms.leetcode import LeetCodeAdapter
 
 from .conftest import graphql_body, mock_client
@@ -17,7 +17,7 @@ CATALOG = {
         {"difficulty": "Medium", "count": 3},
         {"difficulty": "Hard", "count": 2},
     ],
-    "questionTopicTags": {"edges": [{"node": {"slug": "array"}}, {"node": {"slug": "graph"}}]},
+    "questionAllTopicTags": {"edges": [{"node": {"slug": "array"}}, {"node": {"slug": "graph"}}]},
 }
 
 USER = {
@@ -161,3 +161,22 @@ async def test_a_failed_search_is_a_platform_error_not_a_crash() -> None:
 
     with pytest.raises(PlatformError, match="Internal error"):
         await adapter.search([], None, limit=5)
+
+
+async def test_problem_reads_its_own_tags() -> None:
+    row = {
+        "title": "Stone Game",
+        "titleSlug": "stone-game",
+        "difficulty": "Medium",
+        "topicTags": [{"slug": "game-theory"}, {"slug": "zero-sum-game"}],
+    }
+
+    problem = await adapter_answering({"question": row}, []).problem("stone-game")
+
+    assert (problem.title, problem.level) == ("Stone Game", "Medium")
+    assert problem.tags == ["game-theory", "zero-sum-game"]
+
+
+async def test_unknown_problem_raises() -> None:
+    with pytest.raises(ProblemNotFoundError):
+        await adapter_answering({"question": None}, []).problem("nope")
