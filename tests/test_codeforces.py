@@ -124,3 +124,33 @@ async def test_a_problem_added_after_the_cache_is_found_on_refetch() -> None:
     await cf.describe()
 
     assert (await cf.problem("9Z")).title == "P9Z"
+
+
+async def test_a_cold_miss_fetches_the_problemset_once() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"status": "OK", "result": {"problems": PROBLEMSET}})
+
+    cf = CodeforcesAdapter(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+    with pytest.raises(ProblemNotFoundError):
+        await cf.problem("9Z")
+    assert calls == 1
+
+
+async def test_a_failed_refresh_keeps_the_cached_problemset() -> None:
+    answers = [
+        httpx.Response(200, json={"status": "OK", "result": {"problems": PROBLEMSET}}),
+        httpx.Response(503, json={"status": "FAILED", "comment": "Call limit exceeded"}),
+    ]
+    cf = CodeforcesAdapter(
+        httpx.AsyncClient(transport=httpx.MockTransport(lambda request: answers.pop(0)))
+    )
+    await cf.describe()
+
+    with pytest.raises(PlatformError):
+        await cf.problem("9Z")
+    assert (await cf.problem("1A")).problem_id == "1A"
