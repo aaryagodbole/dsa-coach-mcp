@@ -46,7 +46,7 @@ def test_due_lists_overdue_first_and_skips_future(tmp_path: Path) -> None:
     store.record_review(problem("today"), due_in(4), Rating.Good, AT, [])
     store.record_review(problem("overdue"), due_in(1), Rating.Good, AT, [])
 
-    due = store.due(AT + timedelta(days=4), limit=10)
+    due = store.due(AT + timedelta(days=4))
 
     assert [r.problem_id for r in due] == ["overdue", "today"]
 

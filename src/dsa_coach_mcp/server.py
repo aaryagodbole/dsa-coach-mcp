@@ -80,10 +80,13 @@ def create_server(
         today = now().date()
         return today - timedelta(days=min(days, (today - date.min).days))
 
-    def scheduler() -> scheduling.Scheduler:
-        return scheduling.make_scheduler(store.parameters(), fuzz=fuzz)
+    async def scheduler() -> scheduling.Scheduler:
+        """Built once per request: the parameters live in SQLite, read off the loop."""
 
-    def to_card(record: CardRecord, at: datetime) -> ReviewCard:
+        parameters = await asyncio.to_thread(store.parameters)
+        return scheduling.make_scheduler(parameters, fuzz=fuzz)
+
+    def to_card(record: CardRecord, at: datetime, fsrs: scheduling.Scheduler) -> ReviewCard:
         card = record.card
         reviewed = card.last_review is not None
         return ReviewCard(
@@ -94,7 +97,7 @@ def create_server(
             due=card.due,
             stability=card.stability,
             difficulty=card.difficulty,
-            retrievability=scheduler().get_card_retrievability(card, at) if reviewed else None,
+            retrievability=fsrs.get_card_retrievability(card, at) if reviewed else None,
             reviews=record.reviews,
         )
 
@@ -183,7 +186,8 @@ def create_server(
             at = now()
             previous = await asyncio.to_thread(store.get, platform, problem.problem_id)
             card = previous.card if previous else scheduling.Card()
-            card, _ = scheduling.review(scheduler(), card, rating, at)
+            fsrs = await scheduler()
+            card, _ = scheduling.review(fsrs, card, rating, at)
             await asyncio.to_thread(
                 store.record_review,
                 problem,
@@ -194,7 +198,7 @@ def create_server(
             )
             record = await asyncio.to_thread(store.get, platform, problem.problem_id)
         assert record is not None
-        return to_card(record, at)
+        return to_card(record, at, fsrs)
 
     @server.tool(annotations=_READ_LOCAL)
     async def revisions_due(
@@ -204,9 +208,11 @@ def create_server(
         first."""
 
         at = now()
-        records = await asyncio.to_thread(store.due, at, limit)
-        cards = [to_card(record, at) for record in records]
-        return sorted(cards, key=lambda c: (c.retrievability is not None, c.retrievability))
+        fsrs = await scheduler()
+        records = await asyncio.to_thread(store.due, at)
+        cards = [to_card(record, at, fsrs) for record in records]
+        ranked = sorted(cards, key=lambda c: (c.retrievability is not None, c.retrievability))
+        return ranked[:limit]
 
     @server.tool(annotations=_READ_LOCAL)
     async def schedule_info() -> ScheduleInfo:
@@ -218,7 +224,7 @@ def create_server(
         return ScheduleInfo(
             personalised=parameters is not None,
             reviews=len(logs),
-            parameters=list(scheduler().parameters),
+            parameters=list((await scheduler()).parameters),
         )
 
     @server.tool(annotations=_WRITE_LOCAL)

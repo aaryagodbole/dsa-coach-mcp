@@ -334,3 +334,18 @@ async def test_an_unfitted_result_is_not_saved_as_personal(
     with pytest.raises(ToolError, match="too few"):
         await server.call_tool("personalize_schedule", {})
     assert (await call(server, "schedule_info"))["personalised"] is False
+
+
+async def test_the_most_at_risk_card_leads_even_beyond_the_limit(
+    server: MCPServer, clock: Clock
+) -> None:
+    # p0 falls due first but is better remembered; p1 falls due later and is shakier.
+    p0 = await call(server, "log_review", platform="fake", problem_id="p0", rating="good")
+    clock.at = NOW + timedelta(days=10)
+    p1 = await call(server, "log_review", platform="fake", problem_id="p1", rating="again")
+    assert p0["due"] < p1["due"]
+
+    clock.at = NOW + timedelta(days=40)
+    (first,) = (await call(server, "revisions_due", limit=1))["result"]
+
+    assert first["problem_id"] == "p1"

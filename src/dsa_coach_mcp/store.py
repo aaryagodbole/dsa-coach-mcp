@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from collections.abc import Callable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -180,7 +180,10 @@ class ReviewStore:
                     conn.execute(f"PRAGMA user_version = {version}")
                     conn.execute("COMMIT")
                 except BaseException:
-                    conn.execute("ROLLBACK")
+                    # SQLite may already have rolled back (disk full, I/O error); a
+                    # failing ROLLBACK must not hide the error that caused it.
+                    with suppress(sqlite3.Error):
+                        conn.execute("ROLLBACK")
                     raise
         finally:
             conn.close()
@@ -251,11 +254,14 @@ class ReviewStore:
                 ],
             )
 
-    def due(self, at: datetime, limit: int) -> list[CardRecord]:
+    def due(self, at: datetime) -> list[CardRecord]:
+        """Every card due by ``at``. One user's revision queue is small, and ranking it
+        by recall needs all of it."""
+
         with self._connect() as conn:
             rows = conn.execute(
-                f"{_RECORD_SQL} WHERE c.due <= ? ORDER BY c.due LIMIT ?",
-                (at.astimezone(UTC).isoformat(), limit),
+                f"{_RECORD_SQL} WHERE c.due <= ? ORDER BY c.due",
+                (at.astimezone(UTC).isoformat(),),
             ).fetchall()
         return [_to_record(row) for row in rows]
 
