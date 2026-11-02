@@ -132,7 +132,7 @@ claude mcp add dsa-coach -- uvx dsa-coach-mcp
 | `DSA_COACH_DB` | `~/.dsa-coach/coach.db` | Where cards, reviews and mistakes are stored |
 
 To personalise the schedule, install the optimizer extra (it pulls in PyTorch):
-`uvx --from 'dsa-coach-mcp[optimizer] @ git+https://github.com/aaryagodbole/dsa-coach-mcp' dsa-coach-mcp`.
+`uvx --from 'dsa-coach-mcp[optimizer]' dsa-coach-mcp`.
 
 ## Privacy
 

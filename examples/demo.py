@@ -103,7 +103,7 @@ async def run(leetcode: str, codeforces: str, db: Path) -> None:
             "log_review",
             platform="leetcode",
             problem_id=problem["problem_id"],
-            quality=2,
+            rating="hard",
             mistakes=[
                 {"kind": "missed edge case", "note": "did not handle the smallest input"},
                 {
@@ -112,15 +112,20 @@ async def run(leetcode: str, codeforces: str, db: Path) -> None:
                 },
             ],
         )
-        await call(
+        card = await call(
             client,
             "log_review",
             platform="leetcode",
             problem_id=problem["problem_id"],
-            quality=3,
+            rating="good",
             mistakes=[
                 {"kind": "missed edge case", "note": "smallest input wrong again"},
             ],
+        )
+        console.print(
+            f"   [magenta]FSRS[/] next revision {card['due'][:10]} · memory stability "
+            f"{card['stability']:.1f} days · difficulty {card['difficulty']:.1f}/10 · "
+            f"{card['reviews']} reviews logged"
         )
 
         patterns = await call(client, "mistake_patterns")
