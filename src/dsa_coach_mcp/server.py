@@ -13,7 +13,7 @@ import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from pydantic import AnyHttpUrl, Field
+from pydantic import Field
 
 from . import srs
 from .models import (
@@ -111,16 +111,13 @@ def create_server(
         limit: Annotated[int, Field(ge=1, le=100)] = 10,
         exclude_solved_by: str | None = None,
     ) -> list[Problem]:
-        """Problems having every tag given, at the level given. Tags and levels must be
-        values from list_platforms. With exclude_solved_by, skips that handle's solved
-        problems."""
+        """Problems having every tag given, at the level given. Take tags and levels from
+        list_platforms or from problems the platform returned. With exclude_solved_by,
+        skips that handle's solved problems."""
 
         adapter = adapter_for(platform)
         async with _platform_errors(platform):
             info = await adapter.describe()
-            unknown = sorted(set(tags or []) - set(info.tags))
-            if unknown:
-                raise ToolError(f"Unknown {platform} tags {unknown}; see list_platforms")
             if level is not None and level not in info.levels:
                 raise ToolError(f"Unknown {platform} level '{level}'; see list_platforms")
 
@@ -129,34 +126,36 @@ def create_server(
                 solved = set((await adapter.profile(exclude_solved_by)).solved_ids)
             # Over-fetch so excluding solved problems can still fill the page.
             found = await adapter.search(tags or [], level, limit + len(solved))
-        return [p for p in found if p.problem_id not in solved][:limit]
+        results = [p for p in found if p.problem_id not in solved][:limit]
+        # Platforms' own tag lists are incomplete, so an unlisted tag is only reported
+        # when it may be why nothing matched.
+        unlisted = sorted(set(tags or []) - set(info.tags))
+        if not results and unlisted:
+            raise ToolError(
+                f"No {platform} problems found; tags {unlisted} are not in its tag list "
+                "(see list_platforms)"
+            )
+        return results
 
     @server.tool(annotations=_WRITE_LOCAL)
     async def log_review(
         platform: str,
         problem_id: NonBlank,
-        title: NonBlank,
-        url: AnyHttpUrl,
         quality: Annotated[int, Field(ge=srs.MIN_QUALITY, le=srs.MAX_QUALITY)],
-        tags: list[NonBlank] | None = None,
         mistakes: list[Mistake] | None = None,
     ) -> ReviewCard:
         """Record how well the user recalled a problem (0 = could not, 5 = instantly),
         schedule the next revision, and journal any mistakes made on the way.
 
-        Pass the problem's tags from search_problems or get_profile. Give each mistake a
-        short kind, reusing an existing one from mistake_kinds when it fits, and a note
-        on what went wrong in the user's own words."""
+        The problem's title, link and tags are read from the platform itself. Give each
+        mistake a short kind, reusing an existing one from mistake_kinds when it fits, and
+        a note on what went wrong in the user's own words."""
 
         adapter = adapter_for(platform)
-        if tags:
-            async with _platform_errors(platform):
-                known = set((await adapter.describe()).tags)
-            unknown = sorted(set(tags) - known)
-            if unknown:
-                raise ToolError(f"Unknown {platform} tags {unknown}; see list_platforms")
+        async with _platform_errors(platform):
+            problem = await adapter.problem(problem_id)
         async with review_lock:
-            previous = await asyncio.to_thread(store.get, platform, problem_id)
+            previous = await asyncio.to_thread(store.get, platform, problem.problem_id)
             schedule = srs.review(
                 srs.Schedule(
                     previous.ease, previous.interval_days, previous.repetitions, previous.due
@@ -168,15 +167,17 @@ def create_server(
             )
             card = ReviewCard(
                 platform=platform,
-                problem_id=problem_id,
-                title=title,
-                url=str(url),
+                problem_id=problem.problem_id,
+                title=problem.title,
+                url=problem.url,
                 ease=schedule.ease,
                 interval_days=schedule.interval_days,
                 repetitions=schedule.repetitions,
                 due=schedule.due,
             )
-            await asyncio.to_thread(store.record_review, card, tags or [], mistakes or [], today())
+            await asyncio.to_thread(
+                store.record_review, card, problem.tags, mistakes or [], today()
+            )
         return card
 
     @server.tool(annotations=_READ_LOCAL)
@@ -237,8 +238,9 @@ def create_server(
             "Plan my next DSA practice session from my own data."
             f"{target} Read mistake_patterns and list_mistakes to find the mistakes I keep "
             "repeating, and get_profile for where I stand on each platform I use. Then "
-            "pick problems with search_problems, using only tags and levels from "
-            "list_platforms, that make me face those same mistakes again. For each "
+            "pick problems with search_problems, using tags and levels from "
+            "list_platforms or from my problems, that make me face those same mistakes "
+            "again. For each "
             "problem, say which past mistake it targets and what to watch for."
         )
 

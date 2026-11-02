@@ -18,3 +18,10 @@ All notable changes to this project are documented here. The format follows
   them back.
 - `practice_plan` and `revision_quiz` prompts built on the journal.
 - Versioned SQLite schema, so existing databases upgrade in place.
+
+### Changed
+
+- `log_review` takes only the platform, problem id, quality and mistakes; the
+  problem's title, link and tags are read from the platform.
+- `search_problems` accepts tags missing from a platform's tag list, which is
+  incomplete, and reports them only when nothing matched.

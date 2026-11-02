@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import pytest
 
-from dsa_coach_mcp.platforms import PlatformError, UserNotFoundError
+from dsa_coach_mcp.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
 from dsa_coach_mcp.platforms.codeforces import CodeforcesAdapter
 
 
@@ -103,3 +103,54 @@ async def test_a_body_that_is_not_an_object_is_a_platform_error() -> None:
 
     with pytest.raises(PlatformError, match="unexpected response"):
         await CodeforcesAdapter(client).describe()
+
+
+async def test_problem_is_looked_up_in_the_problemset() -> None:
+    cf = adapter({"problemset.problems": {"problems": PROBLEMSET}})
+
+    assert (await cf.problem("1B")).tags == ["dp", "graphs"]
+    with pytest.raises(ProblemNotFoundError):
+        await cf.problem("9Z")
+
+
+async def test_a_problem_added_after_the_cache_is_found_on_refetch() -> None:
+    added = problem(9, "Z", ["dp"], 1200)
+    pages = [{"problems": PROBLEMSET}, {"problems": [*PROBLEMSET, added]}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"status": "OK", "result": pages.pop(0)})
+
+    cf = CodeforcesAdapter(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    await cf.describe()
+
+    assert (await cf.problem("9Z")).title == "P9Z"
+
+
+async def test_a_cold_miss_fetches_the_problemset_once() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"status": "OK", "result": {"problems": PROBLEMSET}})
+
+    cf = CodeforcesAdapter(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+    with pytest.raises(ProblemNotFoundError):
+        await cf.problem("9Z")
+    assert calls == 1
+
+
+async def test_a_failed_refresh_keeps_the_cached_problemset() -> None:
+    answers = [
+        httpx.Response(200, json={"status": "OK", "result": {"problems": PROBLEMSET}}),
+        httpx.Response(503, json={"status": "FAILED", "comment": "Call limit exceeded"}),
+    ]
+    cf = CodeforcesAdapter(
+        httpx.AsyncClient(transport=httpx.MockTransport(lambda request: answers.pop(0)))
+    )
+    await cf.describe()
+
+    with pytest.raises(PlatformError):
+        await cf.problem("9Z")
+    assert (await cf.problem("1A")).problem_id == "1A"

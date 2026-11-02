@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 import httpx
 
-from .base import PlatformAdapter, PlatformError, UserNotFoundError
+from .base import PlatformAdapter, PlatformError, ProblemNotFoundError, UserNotFoundError
 from .codeforces import CodeforcesAdapter
 from .leetcode import LeetCodeAdapter
 
@@ -31,6 +31,7 @@ __all__ = [
     "ADAPTERS",
     "PlatformAdapter",
     "PlatformError",
+    "ProblemNotFoundError",
     "UserNotFoundError",
     "build_adapters",
 ]

@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from ..models import PlatformInfo, Problem, Profile, Submission
-from .base import PlatformError, UserNotFoundError
+from .base import PlatformError, ProblemNotFoundError, UserNotFoundError
 
 _GRAPHQL_URL = "https://leetcode.com/graphql"
 # LeetCode rejects GraphQL calls without a same-site referer.
@@ -32,7 +32,7 @@ query profile($username: String!, $limit: Int!) {
 _DESCRIBE_QUERY = """
 {
   allQuestionsCount { difficulty count }
-  questionTopicTags { edges { node { slug } } }
+  questionAllTopicTags { edges { node { slug } } }
 }
 """
 
@@ -41,6 +41,13 @@ query search($filters: QuestionListFilterInput, $limit: Int!, $skip: Int!) {
   questionList(categorySlug: "", limit: $limit, skip: $skip, filters: $filters) {
     data { title titleSlug difficulty isPaidOnly topicTags { slug } }
   }
+}
+"""
+
+
+_PROBLEM_QUERY = """
+query problem($slug: String!) {
+  question(titleSlug: $slug) { title titleSlug difficulty topicTags { slug } }
 }
 """
 
@@ -105,9 +112,13 @@ class LeetCodeAdapter:
             data = await self._query(_DESCRIBE_QUERY)
             self._info = PlatformInfo(
                 name=self.name,
-                tags=[edge["node"]["slug"] for edge in data["questionTopicTags"]["edges"]],
+                tags=[edge["node"]["slug"] for edge in data["questionAllTopicTags"]["edges"]],
                 levels=_difficulties(data["allQuestionsCount"]),
-                limitations=["Paid-only problems are never returned by search."],
+                limitations=[
+                    "Paid-only problems are never returned by search.",
+                    "The tag list is LeetCode's own and is not complete: some problems carry "
+                    "tags it does not list.",
+                ],
             )
         return self._info
 
@@ -190,3 +201,17 @@ class LeetCodeAdapter:
                 break
             skip += len(rows)
         return found[:limit]
+
+    async def problem(self, problem_id: str) -> Problem:
+        data = await self._query(_PROBLEM_QUERY, {"slug": problem_id})
+        row = data.get("question")
+        if row is None:
+            raise ProblemNotFoundError(f"LeetCode problem '{problem_id}' not found")
+        return Problem(
+            platform=self.name,
+            problem_id=row["titleSlug"],
+            title=row["title"],
+            url=_problem_url(row["titleSlug"]),
+            tags=[tag["slug"] for tag in row["topicTags"]],
+            level=row["difficulty"],
+        )

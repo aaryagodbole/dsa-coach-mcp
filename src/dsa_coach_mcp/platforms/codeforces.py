@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from ..models import PlatformInfo, Problem, Profile, Submission
-from .base import PlatformError, UserNotFoundError
+from .base import PlatformError, ProblemNotFoundError, UserNotFoundError
 
 _API_URL = "https://codeforces.com/api"
 # The user.info fields that describe skill; the rest (avatar, contribution, ...) do not.
@@ -58,9 +58,10 @@ class CodeforcesAdapter:
             raise error(f"Codeforces {method}: {comment}")
         return body["result"]
 
-    async def _all_problems(self) -> list[dict[str, Any]]:
-        if self._problemset is None:
+    async def _all_problems(self, *, refresh: bool = False) -> list[dict[str, Any]]:
+        if self._problemset is None or refresh:
             result = await self._call("problemset.problems", {})
+            # Replaced only once a fetch succeeds, so a failed refresh keeps the cache.
             self._problemset = list(result["problems"])
         return self._problemset
 
@@ -129,3 +130,19 @@ class CodeforcesAdapter:
             if len(found) >= limit:
                 break
         return found
+
+    async def problem(self, problem_id: str) -> Problem:
+        was_cached = self._problemset is not None
+        found = self._find(await self._all_problems(), problem_id)
+        if found is None and was_cached:
+            # The cache may predate a problem added since; a fetch made just now cannot.
+            found = self._find(await self._all_problems(refresh=True), problem_id)
+        if found is None:
+            raise ProblemNotFoundError(f"Codeforces problem '{problem_id}' not found")
+        return found
+
+    def _find(self, problems: list[dict[str, Any]], problem_id: str) -> Problem | None:
+        for problem in problems:
+            if _problem_id(problem) == problem_id:
+                return _to_problem(self.name, problem, problem_id)
+        return None

@@ -47,9 +47,11 @@ flowchart LR
 
 - **Adapters** translate one platform's API into shared models (`Problem`, `Profile`,
   `PlatformInfo`). Nothing outside an adapter names a platform.
-- **Filter values come from the platforms.** Tags and levels are read from each
-  platform's API, and `search_problems` rejects anything outside them, so the
-  model can't invent a tag.
+- **Data comes from the platforms.** Tags and levels are read from each platform's
+  API, and a review takes the problem's title, link and tags from the platform rather
+  than from the model, so nothing in your history is invented. Platforms' own tag
+  lists are incomplete, so `search_problems` accepts a tag outside them and only
+  reports it when nothing matched.
 - **Profiles say what they can't see.** Each profile carries `limitations`, e.g.
   LeetCode only exposes your 20 most recent accepted submissions publicly.
 
@@ -60,7 +62,7 @@ flowchart LR
 | `list_platforms` | Connected platforms, with the tags and levels each accepts as filters |
 | `get_profile` | Your level, solved and unsolved counts per tag, and recent submissions |
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
-| `log_review` | Records how well you recalled a problem (0-5) and schedules the next revision |
+| `log_review` | Records how well you recalled a problem (0-5), journals the mistakes behind it, and schedules the next revision. Title, link and tags come from the platform |
 | `revisions_due` | Problems due for revision today or overdue |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
