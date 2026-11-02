@@ -51,10 +51,20 @@ class ReviewCard(BaseModel):
     problem_id: str
     title: str
     url: str
-    ease: float
-    interval_days: int
-    repetitions: int
-    due: date
+    due: datetime
+    # FSRS memory state: days until recall drops to 90%, and how hard the problem is
+    # for this user (1-10). Unset until the first review.
+    stability: float | None = None
+    difficulty: float | None = None
+    # FSRS's estimate of the chance the user recalls it right now.
+    retrievability: float | None = None
+    reviews: int = 0
+
+
+class ScheduleInfo(BaseModel):
+    personalised: bool
+    reviews: int
+    parameters: list[float]
 
 
 class Mistake(BaseModel):

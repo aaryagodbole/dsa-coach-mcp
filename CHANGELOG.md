@@ -10,6 +10,17 @@ All notable changes to this project are documented here. The format follows
 
 - Listed in the official MCP Registry as `io.github.aaryagodbole/dsa-coach-mcp`: the
   release workflow publishes `server.json` after PyPI, authenticated with GitHub OIDC.
+- `schedule_info` and `personalize_schedule`: inspect the FSRS parameters, and fit them
+  to the user's own review history with the `optimizer` extra. A fit that leaves FSRS's
+  defaults unchanged (too little history) is reported and not saved.
+
+### Changed
+
+- Revision scheduling moved from SM-2 to FSRS (py-fsrs). `log_review` takes a rating of
+  `again`, `hard`, `good` or `easy`; every review is logged; `revisions_due` lists the
+  problem the user is least likely to recall first, with FSRS's recall estimate.
+  Existing databases upgrade in place: cards keep their due dates and start FSRS at
+  their next review.
 
 ## [0.1.0] - 2026-11-02
 
