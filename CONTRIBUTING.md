@@ -40,11 +40,13 @@ so no API token is stored anywhere.
    for `dsa-coach-mcp` (repository `aaryagodbole/dsa-coach-mcp`, workflow `release.yml`,
    environment `pypi`) at pypi.org → Publishing. The `pypi` GitHub environment only
    accepts `v*` tags.
-2. Bump `version` in `pyproject.toml` and move the `Unreleased` changelog entries under a
+2. Bump `version` in `pyproject.toml` and `server.json`, and move the `Unreleased` changelog entries under a
    new `## [x.y.z] - YYYY-MM-DD` heading, in a pull request.
 3. After it merges, tag `main` and push the tag:
    ```bash
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
 4. The release workflow checks the tag matches the package version, runs the tests,
-   builds, publishes to PyPI, and creates the GitHub release from the changelog entry.
+   builds, publishes to PyPI, creates the GitHub release from the changelog entry, and
+   publishes `server.json` to the MCP Registry. Keep `server.json`'s versions equal to
+   `pyproject.toml`'s; a test checks it.

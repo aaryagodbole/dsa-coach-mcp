@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Listed in the official MCP Registry as `io.github.aaryagodbole/dsa-coach-mcp`: the
+  release workflow publishes `server.json` after PyPI, authenticated with GitHub OIDC.
+
 ## [0.1.0] - 2026-11-02
 
 First release.

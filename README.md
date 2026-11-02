@@ -1,5 +1,7 @@
 # dsa-coach-mcp
 
+<!-- mcp-name: io.github.aaryagodbole/dsa-coach-mcp -->
+
 [![CI](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/dsa-coach-mcp.svg)](https://pypi.org/project/dsa-coach-mcp/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
