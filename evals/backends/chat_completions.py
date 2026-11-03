@@ -84,7 +84,9 @@ class ChatCompletionsConversation:
             echoed["tool_calls"] = raw_calls
         self._messages.append(echoed)
 
-        usage = body.get("usage") or {}
+        usage = body.get("usage")
+        if usage is None:
+            usage = {}
         if not isinstance(usage, dict):
             raise BackendError(f"{b._url} answered with malformed usage: {usage!r}")
         return Turn(
@@ -103,7 +105,9 @@ class ChatCompletionsConversation:
 
 
 def _token_count(usage: dict[str, Any], key: str) -> int:
-    count = usage.get(key) or 0
+    count = usage.get(key)
+    if count is None:
+        return 0
     # bool is an int subclass, but never a token count.
     if not isinstance(count, int) or isinstance(count, bool) or count < 0:
         raise BackendError(f"malformed {key}: {count!r}")
