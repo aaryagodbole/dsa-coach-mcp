@@ -105,6 +105,31 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           jq --arg v "$version" '.version = $v | .packages[0].version = $v' server.json > server.tmp
           mv server.tmp server.json
-      - run: ./mcp-publisher login github-oidc
-      - run: ./mcp-publisher publish
+      - name: Check whether this version is already listed
+        id: listed
+        run: |
+          name=$(jq -r .name server.json)
+          version=$(jq -r .version server.json)
+          url="https://registry.modelcontextprotocol.io/v0/servers/$(jq -rn --arg n "$name" '$n|@uri')/versions/$version"
+          status=$(curl --silent --show-error --output listed.json --write-out '%{http_code}' "$url")
+          if [ "$status" = 404 ]; then
+            echo "listed=false" >> "$GITHUB_OUTPUT"
+          elif [ "$status" = 200 ]; then
+            # A rerun of the same release: the registry rejects duplicate versions, so
+            # skip only when what is listed is what this release would publish.
+            fields='{description, version, packages: [(.packages // [])[] | {registryType, identifier, version}]}'
+            if [ "$(jq -S "$fields" server.json)" = "$(jq -S ".server | $fields" listed.json)" ]; then
+              echo "listed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name $version is already listed with different metadata" >&2
+              exit 1
+            fi
+          else
+            echo "registry lookup failed with HTTP $status" >&2
+            exit 1
+          fi
+      - if: steps.listed.outputs.listed == 'false'
+        run: ./mcp-publisher login github-oidc
+      - if: steps.listed.outputs.listed == 'false'
+        run: ./mcp-publisher publish
 
