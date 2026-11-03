@@ -124,6 +124,10 @@ async def test_every_tool_declares_all_four_behavior_hints(server: MCPServer) ->
         assert hints is not None, tool.name
         for hint in ("read_only_hint", "destructive_hint", "idempotent_hint", "open_world_hint"):
             assert isinstance(getattr(hints, hint), bool), (tool.name, hint)
+        # No tool deletes or overwrites data; reads are also safe to repeat.
+        assert hints.destructive_hint is False, tool.name
+        if hints.read_only_hint:
+            assert hints.idempotent_hint is True, tool.name
 
 
 async def test_prompts_only_name_tools_and_arguments_that_exist(server: MCPServer) -> None:
