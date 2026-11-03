@@ -4,6 +4,7 @@ provider."""
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 from collections.abc import Sequence
@@ -13,6 +14,12 @@ from urllib.parse import urlsplit
 import httpx
 
 from evals.backends.base import BackendError, ToolOutcome, ToolRequest, ToolSpec, Turn, Usage
+
+# Rate limits and overloaded servers clear on their own, and free tiers hit both often;
+# without a retry one busy moment ends the whole run.
+_TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
+_RETRY_DELAYS = (2.0, 4.0, 8.0, 16.0, 32.0)
+_MAX_RETRY_AFTER = 60.0
 
 
 class ChatCompletionsBackend:
@@ -61,12 +68,12 @@ class ChatCompletionsConversation:
 
     async def next_turn(self) -> Turn:
         b = self._backend
-        response = await b._http.post(
+        response = await _post_with_retries(
+            b._http,
             b._url,
-            headers=b._headers,
-            json={"model": b._model, "messages": self._messages, "tools": self._tools},
+            b._headers,
+            {"model": b._model, "messages": self._messages, "tools": self._tools},
         )
-        response.raise_for_status()
         try:
             body = response.json()
             message = body["choices"][0]["message"]
@@ -108,6 +115,34 @@ class ChatCompletionsConversation:
         self._messages.extend(
             {"role": "tool", "tool_call_id": o.request.id, "content": o.text} for o in outcomes
         )
+
+
+async def _post_with_retries(
+    http: httpx.AsyncClient, url: str, headers: dict[str, str], body: dict[str, Any]
+) -> httpx.Response:
+    for delay in _RETRY_DELAYS:
+        try:
+            response = await http.post(url, headers=headers, json=body)
+        except httpx.TransportError:
+            pass
+        else:
+            if response.status_code not in _TRANSIENT_STATUSES:
+                response.raise_for_status()
+                return response
+            delay = _retry_after(response) or delay
+        await asyncio.sleep(delay)
+    response = await http.post(url, headers=headers, json=body)
+    response.raise_for_status()
+    return response
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    # Only the seconds form; an HTTP date falls back to the default backoff.
+    try:
+        seconds = float(response.headers.get("Retry-After", ""))
+    except ValueError:
+        return None
+    return min(seconds, _MAX_RETRY_AFTER) if seconds > 0 else None
 
 
 def _token_count(usage: dict[str, Any], key: str) -> int:
