@@ -109,6 +109,7 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
         "personalize_schedule",
         "record_problem",
         "progress",
+        "show_dashboard",
         "mistake_kinds",
         "list_mistakes",
         "mistake_patterns",
@@ -506,3 +507,57 @@ async def test_one_platform_down_leaves_the_others_listed(tmp_path: Path) -> Non
     assert platforms["fake"]["tags"]
     assert platforms["down"]["limitations"] == ["Unavailable right now: upstream timeout"]
     assert "hackerrank.com" in platforms
+
+
+async def test_dashboard_is_an_mcp_app_linked_from_its_tool(server: MCPServer) -> None:
+    from mcp import Client
+
+    from dsa_coach_mcp.server import DASHBOARD_URI, MCP_APP_MIME_TYPE
+
+    async with Client(server) as client:
+        tools = {t.name: t for t in (await client.list_tools()).tools}
+        resource = (await client.read_resource(DASHBOARD_URI)).contents[0]
+
+    assert tools["show_dashboard"].meta == {"ui": {"resourceUri": DASHBOARD_URI}}
+    assert resource.mime_type == MCP_APP_MIME_TYPE
+    html = resource.text  # type: ignore[union-attr]
+    assert "ui/initialize" in html
+    assert "ui/notifications/tool-result" in html
+    # Self-contained: hosts sandbox the view, and it loads nothing from elsewhere.
+    assert "<script src" not in html
+    assert "<link" not in html
+
+
+async def test_dashboard_initializes_with_the_mcp_apps_handshake(server: MCPServer) -> None:
+    import re
+
+    from mcp import Client
+
+    from dsa_coach_mcp.server import DASHBOARD_URI
+
+    async with Client(server) as client:
+        resource = (await client.read_resource(DASHBOARD_URI)).contents[0]
+    html = resource.text  # type: ignore[union-attr]
+
+    # McpUiInitializeRequest params are exactly protocolVersion, appInfo and appCapabilities.
+    params = re.search(r'request\("ui/initialize", \{(.*?)\n  \}\)', html, re.S)
+    assert params
+    keys = re.findall(r"^\s{4}(\w+):", params.group(1), re.M)
+    assert keys == ["protocolVersion", "appInfo", "appCapabilities"]
+    # Sandboxed views can't open windows, so links go through the host.
+    assert 'request("ui/open-link", { url })' in html
+
+
+async def test_dashboard_reports_progress_due_cards_and_patterns(
+    server: MCPServer, clock: Clock
+) -> None:
+    await call(server, "log_review", **REVIEW, mistakes=[{"kind": "k", "note": "n"}])
+    clock.at = NOW + timedelta(days=30)
+
+    dashboard = await call(server, "show_dashboard")
+
+    assert dashboard["progress"] == [
+        {"platform": "fake", "source": "platform", "problems": 1, "reviews": 1, "due_now": 1}
+    ]
+    assert [c["problem_id"] for c in dashboard["due"]] == ["p0"]
+    assert [k["kind"] for k in dashboard["patterns"]["kinds"]] == ["k"]

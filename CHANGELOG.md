@@ -10,6 +10,11 @@ All notable changes to this project are documented here. The format follows
 
 - Listed in the official MCP Registry as `io.github.aaryagodbole/dsa-coach-mcp`: the
   release workflow publishes `server.json` after PyPI, authenticated with GitHub OIDC.
+- `show_dashboard`, an MCP App (`ui://dsa-coach/dashboard`, `text/html;profile=mcp-app`):
+  progress per platform, revisions due ordered by FSRS's recall estimate, and a heatmap
+  of mistakes by label and tag, rendered in the conversation by hosts that support MCP
+  Apps. `examples/dashboard_host.py` previews it without a host.
+
 - Any platform: `record_problem` records a problem from a platform with no adapter, as
   read from its page (for example through Playwright MCP's browser extension). The
   platform is the URL's host; such problems are marked `reported`, and `list_platforms`

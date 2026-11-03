@@ -7,6 +7,7 @@ import asyncio
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
+from importlib.resources import files
 from typing import Annotated
 from urllib.parse import urlsplit
 
@@ -18,6 +19,7 @@ from pydantic import AnyHttpUrl, Field
 
 from . import scheduling
 from .models import (
+    Dashboard,
     Mistake,
     MistakeEntry,
     MistakeKind,
@@ -45,6 +47,11 @@ revisions_due lists what to revise now, least likely to be remembered first;
 mistake_patterns and list_mistakes show where the user keeps going wrong.
 For a platform with no adapter, read the problem page (for example with a browser MCP
 server) and call record_problem with its URL, title and tags before log_review."""
+
+# MCP Apps (io.modelcontextprotocol/ui, spec 2026-01-26): a tool names a ui:// resource
+# that hosts render as an interactive view; other hosts just show the tool's result.
+DASHBOARD_URI = "ui://dsa-coach/dashboard"
+MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 
 _READ_REMOTE = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 _READ_LOCAL = ToolAnnotations(read_only_hint=True, open_world_hint=False)
@@ -387,6 +394,50 @@ def create_server(
         Counts only; reading what they say about the user is up to you."""
 
         return await asyncio.to_thread(store.patterns, lookback(days))
+
+    @server.resource(
+        DASHBOARD_URI,
+        name="dashboard",
+        title="DSA coach dashboard",
+        mime_type=MCP_APP_MIME_TYPE,
+        meta={"ui": {"prefersBorder": True}},
+    )
+    def dashboard_view() -> str:
+        """Interactive view for show_dashboard."""
+
+        return files("dsa_coach_mcp").joinpath("ui/dashboard.html").read_text("utf-8")
+
+    @server.tool(annotations=_READ_LOCAL, meta={"ui": {"resourceUri": DASHBOARD_URI}})
+    async def show_dashboard(
+        limit: Annotated[int, Field(ge=1, le=100)] = 15,
+        days: Annotated[int | None, Field(ge=1)] = None,
+    ) -> Dashboard:
+        """Show the user's progress per platform, the revisions due now ordered by how
+        likely they are to be forgotten, and a heatmap of mistakes by label and tag.
+        Hosts that support MCP Apps render it as an interactive dashboard."""
+
+        at = now()
+        rows = await asyncio.to_thread(store.progress, at)
+        fsrs = await scheduler()
+        records = await asyncio.to_thread(store.due, at)
+        due = sorted(
+            (to_card(record, at, fsrs) for record in records),
+            key=lambda c: (c.retrievability is not None, c.retrievability),
+        )[:limit]
+        return Dashboard(
+            progress=[
+                PlatformProgress(
+                    platform=platform,
+                    source="platform" if platform in adapters else "reported",
+                    problems=problems,
+                    reviews=reviews,
+                    due_now=due_now,
+                )
+                for platform, problems, reviews, due_now in rows
+            ],
+            due=due,
+            patterns=await asyncio.to_thread(store.patterns, lookback(days)),
+        )
 
     @server.prompt()
     def practice_plan(focus: str = "") -> str:

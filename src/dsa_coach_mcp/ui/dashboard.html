@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSA coach</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --card: #f6f8fa; --line: #d0d7de;
+    --accent: #0969da; --risk: #cf222e; --ok: #1a7f37;
+    --heat: 9, 105, 218;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --card: #161b22; --line: #30363d;
+    --accent: #4493f8; --risk: #f85149; --ok: #3fb950;
+    --heat: 68, 147, 248;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 20px 0 8px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .card .name { font-weight: 600; overflow-wrap: anywhere; }
+  .card .tag { font-size: 11px; color: var(--muted); }
+  .stats { display: flex; gap: 12px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+  .stats b { color: var(--fg); font-size: 16px; display: block; }
+  .due { display: grid; gap: 6px; }
+  .row { display: grid; grid-template-columns: 1fr 120px 44px; gap: 10px; align-items: center; }
+  .row a { color: var(--fg); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row a:hover { color: var(--accent); }
+  .row .note { grid-column: 1 / -1; overflow-wrap: anywhere; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar span { display: block; height: 100%; }
+  .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+  table { border-collapse: collapse; font-size: 12px; }
+  th, td { border: 1px solid var(--line); padding: 4px 6px; text-align: center; }
+  th { font-weight: 600; color: var(--muted); }
+  th.kind { text-align: left; color: var(--fg); max-width: 220px; }
+  .scroll { overflow-x: auto; }
+  .empty { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<div id="app"><p class="empty">Waiting for data…</p></div>
+<script>
+// MCP Apps view (spec 2026-01-26), talking JSON-RPC to the host over postMessage.
+// No external scripts: everything the page needs is in this file.
+(() => {
+  const PROTOCOL_VERSION = "2026-01-26";
+  let nextId = 1;
+  const pending = new Map();
+
+  const send = (msg) => window.parent.postMessage({ jsonrpc: "2.0", ...msg }, "*");
+  const request = (method, params) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    pending.set(id, { resolve, reject });
+    send({ id, method, params });
+  });
+  const notify = (method, params) => send({ method, params });
+
+  const el = (tag, attrs = {}, ...children) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "style") node.style.cssText = v; else node.setAttribute(k, v);
+    }
+    for (const child of children) node.append(child);
+    return node;
+  };
+
+  const applyTheme = (context) => {
+    if (context && context.theme) document.documentElement.dataset.theme = context.theme;
+  };
+
+  const reportSize = () => notify("ui/notifications/size-changed", {
+    width: document.documentElement.scrollWidth,
+    height: document.documentElement.scrollHeight,
+  });
+
+  // Sandboxed views may not open windows themselves; ask the host to open the link.
+  const link = (url, text) => {
+    const safe = /^https?:\/\//.test(url);
+    const a = el("a", { href: safe ? url : "#", title: text }, text);
+    a.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (!safe) return;
+      const failed = () => {
+        // Leave the address visible so the user can still open it themselves.
+        const row = a.parentElement;
+        if (!row || row.querySelector(".note")) return;
+        row.append(el("div", { class: "note empty" }, `Couldn't open this link: ${url}`));
+        reportSize();
+      };
+      request("ui/open-link", { url })
+        .then((result) => { if (result && result.isError) failed(); })
+        .catch(failed);
+    });
+    return a;
+  };
+
+  const riskColour = (r) => r < 0.7 ? "var(--risk)" : r < 0.85 ? "var(--accent)" : "var(--ok)";
+
+  function render(data) {
+    const app = document.getElementById("app");
+    app.replaceChildren();
+
+    app.append(el("h2", {}, "Platforms"));
+    if (!data.progress.length) app.append(el("p", { class: "empty" }, "No reviews yet."));
+    const grid = el("div", { class: "grid" });
+    for (const p of data.progress) {
+      grid.append(el("div", { class: "card" },
+        el("div", { class: "name" }, p.platform),
+        el("div", { class: "tag" }, p.source === "reported" ? "recorded from pages" : "from the platform's API"),
+        el("div", { class: "stats" },
+          el("div", {}, el("b", {}, String(p.problems)), "problems"),
+          el("div", {}, el("b", {}, String(p.reviews)), "reviews"),
+          el("div", {}, el("b", {}, String(p.due_now)), "due"))));
+    }
+    app.append(grid);
+
+    app.append(el("h2", {}, "Due now · chance you still remember it"));
+    if (!data.due.length) app.append(el("p", { class: "empty" }, "Nothing due. Nice."));
+    const due = el("div", { class: "due" });
+    for (const c of data.due) {
+      const r = c.retrievability ?? 0;
+      due.append(el("div", { class: "row" },
+        link(c.url, `${c.title} · ${c.platform}`),
+        el("div", { class: "bar" }, el("span", { style: `width:${Math.round(r * 100)}%;background:${riskColour(r)}` })),
+        el("div", { class: "pct" }, c.retrievability == null ? "new" : `${Math.round(r * 100)}%`)));
+    }
+    app.append(due);
+
+    app.append(el("h2", {}, "Mistakes · by label and problem tag"));
+    const cells = data.patterns.by_tag;
+    if (!data.patterns.kinds.length) {
+      app.append(el("p", { class: "empty" }, "No mistakes journaled yet."));
+    } else {
+      // Every label shows its total; tag columns only appear for tagged problems, so a
+      // journal of untagged mistakes still shows up.
+      const kinds = data.patterns.kinds;
+      const tags = [...new Set(cells.map((c) => c.key))];
+      const count = new Map(cells.map((c) => [`${c.kind}\u0000${c.key}`, c.count]));
+      const max = Math.max(1, ...cells.map((c) => c.count));
+      const head = el("tr", {}, el("th", {}, ""), el("th", {}, "total"),
+                      ...tags.map((t) => el("th", {}, t)));
+      const rows = kinds.map(({ kind: k, count: total }) => el("tr", {},
+        el("th", { class: "kind" }, k), el("td", {}, String(total)),
+        ...tags.map((t) => {
+          const n = count.get(`${k}\u0000${t}`) || 0;
+          return el("td", { style: n ? `background:rgba(var(--heat),${0.15 + 0.85 * n / max})` : "" },
+                    n ? String(n) : "");
+        })));
+      app.append(el("div", { class: "scroll" }, el("table", {}, head, ...rows)));
+    }
+    reportSize();
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent) return;
+    const msg = event.data;
+    if (!msg || msg.jsonrpc !== "2.0") return;
+    if (msg.id !== undefined && pending.has(msg.id)) {
+      const { resolve, reject } = pending.get(msg.id);
+      pending.delete(msg.id);
+      msg.error ? reject(msg.error) : resolve(msg.result);
+      return;
+    }
+    if (msg.method === "ui/notifications/tool-result") {
+      const data = msg.params && msg.params.structuredContent;
+      if (data) render(data);
+    } else if (msg.method === "ui/notifications/host-context-changed") {
+      applyTheme(msg.params);
+    }
+  });
+
+  request("ui/initialize", {
+    protocolVersion: PROTOCOL_VERSION,
+    appInfo: { name: "dsa-coach-dashboard", version: "1" },
+    appCapabilities: { availableDisplayModes: ["inline"] },
+  }).then((result) => {
+    applyTheme(result && result.hostContext);
+    notify("ui/notifications/initialized", {});
+    reportSize();
+  });
+})();
+</script>
+</body>
+</html>
