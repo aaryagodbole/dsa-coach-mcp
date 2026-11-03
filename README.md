@@ -23,8 +23,16 @@ solved on a spaced-repetition schedule, with a **mistake journal** that remember
 Practice data is split across sites, and each grades difficulty its own way
 (LeetCode's Easy/Medium/Hard, Codeforces' 800-3500 ratings). Most trackers count
 problems; few tell you what you are forgetting. This server puts both platforms
-behind one interface and adds [SM-2](https://super-memory.com/english/ol/sm2.htm)
-revision scheduling, so the model you already talk to can coach you.
+behind one interface and schedules revision with
+[FSRS](https://github.com/open-spaced-repetition/fsrs4anki/wiki/ABC-of-FSRS), so the model
+you already talk to can coach you.
+
+FSRS predicts the chance you still remember each problem and brings it back just before
+that chance drops below 90%. In the open
+[spaced-repetition benchmark](https://github.com/open-spaced-repetition/srs-benchmark)
+over ~10k Anki collections, FSRS predicted recall better than SM-2 for the large
+majority of users. Once you have a review history, `personalize_schedule` fits its
+parameters to how fast **you** forget.
 
 Counting solved problems hides the real signal: the same few mistakes, repeated. Every
 review can carry the mistakes behind it, and the model turns those patterns into
@@ -42,7 +50,7 @@ flowchart LR
     Server --> Registry["platforms/<br/>adapter registry"]
     Registry --> LC["LeetCodeAdapter<br/>GraphQL"]
     Registry --> CF["CodeforcesAdapter<br/>REST"]
-    Server --> SRS["srs.py<br/>SM-2"] --> Store[("SQLite<br/>review cards")]
+    Server --> SRS["scheduling.py<br/>FSRS"] --> Store[("SQLite<br/>cards, reviews,<br/>mistakes")]
 ```
 
 - **Adapters** translate one platform's API into shared models (`Problem`, `Profile`,
@@ -62,8 +70,10 @@ flowchart LR
 | `list_platforms` | Connected platforms, with the tags and levels each accepts as filters |
 | `get_profile` | Your level, solved and unsolved counts per tag, and recent submissions |
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
-| `log_review` | Records how well you recalled a problem (0-5), journals the mistakes behind it, and schedules the next revision. Title, link and tags come from the platform |
-| `revisions_due` | Problems due for revision today or overdue |
+| `log_review` | Records how you did (`again` / `hard` / `good` / `easy`), journals the mistakes behind it, and schedules the next revision with FSRS. Title, link and tags come from the platform |
+| `revisions_due` | Problems due now, the one you are least likely to remember first, each with FSRS's recall estimate |
+| `schedule_info` | The FSRS parameters in use, whether they are personalised, and how many reviews are logged |
+| `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
 | `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |
@@ -85,7 +95,7 @@ them; spotting the pattern is the model's job.
 ```text
 You:    Redid Course Schedule. Forgot to detect the cycle again, and used DFS recursion
         that would overflow on 10^5 nodes.
-Claude: (log_review with quality 2 and two mistakes, reusing your existing
+Claude: (log_review rated "hard" with two mistakes, reusing your existing
         "missed cycle detection" label)
         That's the third time cycle detection has slipped on graph problems ...
 ```
@@ -119,7 +129,10 @@ claude mcp add dsa-coach -- uvx dsa-coach-mcp
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DSA_COACH_DB` | `~/.dsa-coach/coach.db` | Where revision cards are stored |
+| `DSA_COACH_DB` | `~/.dsa-coach/coach.db` | Where cards, reviews and mistakes are stored |
+
+To personalise the schedule, install the optimizer extra (it pulls in PyTorch):
+`uvx --from 'dsa-coach-mcp[optimizer]' dsa-coach-mcp`.
 
 ## Privacy
 

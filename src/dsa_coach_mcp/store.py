@@ -1,14 +1,17 @@
-"""Local SQLite store for revision cards and the mistake journal."""
+"""Local SQLite store for review cards, review history and the mistake journal."""
 
 from __future__ import annotations
 
 import json
 import os
 import sqlite3
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
-from datetime import date
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from pathlib import Path
+
+from fsrs import Card, Rating, ReviewLog
 
 from .models import (
     Mistake,
@@ -16,14 +19,85 @@ from .models import (
     MistakeEntry,
     MistakeKind,
     MistakePatterns,
-    ReviewCard,
+    Problem,
 )
 
 DB_PATH_ENV = "DSA_COACH_DB"
 DEFAULT_DB_PATH = Path.home() / ".dsa-coach" / "coach.db"
 
+
+@dataclass(frozen=True)
+class CardRecord:
+    platform: str
+    problem_id: str
+    title: str
+    url: str
+    card: Card
+    reviews: int
+
+
+def _move_to_fsrs(conn: sqlite3.Connection) -> None:
+    """Version 3: SM-2 cards become FSRS cards, reviews are logged one by one, and
+    mistakes point at the new cards.
+
+    SM-2's ease and interval cannot be translated into FSRS memory state, so each card
+    keeps its due date and starts FSRS afresh at its next review."""
+
+    conn.executescript(
+        """
+        CREATE TABLE cards (
+            id         INTEGER PRIMARY KEY,
+            platform   TEXT NOT NULL,
+            problem_id TEXT NOT NULL,
+            title      TEXT NOT NULL,
+            url        TEXT NOT NULL,
+            fsrs       TEXT NOT NULL,
+            due        TEXT NOT NULL,
+            UNIQUE (platform, problem_id)
+        );
+        CREATE INDEX cards_due ON cards (due);
+        CREATE TABLE reviews (
+            id          INTEGER PRIMARY KEY,
+            card_id     INTEGER NOT NULL REFERENCES cards (id),
+            rating      INTEGER NOT NULL,
+            reviewed_at TEXT    NOT NULL
+        );
+        CREATE INDEX reviews_card ON reviews (card_id);
+        CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        """
+    )
+    old = conn.execute("SELECT platform, problem_id, title, url, due FROM review_cards")
+    for row in old.fetchall():
+        due = datetime.combine(date.fromisoformat(row[4]), datetime.min.time(), tzinfo=UTC)
+        conn.execute(
+            "INSERT INTO cards (platform, problem_id, title, url, fsrs, due) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (*row[:4], Card(due=due).to_json(), due.isoformat()),
+        )
+    conn.executescript(
+        """
+        CREATE TABLE mistakes_v3 (
+            id         INTEGER PRIMARY KEY,
+            platform   TEXT NOT NULL,
+            problem_id TEXT NOT NULL,
+            tags       TEXT NOT NULL,
+            kind       TEXT NOT NULL,
+            note       TEXT NOT NULL,
+            logged_on  TEXT NOT NULL,
+            FOREIGN KEY (platform, problem_id) REFERENCES cards (platform, problem_id)
+        );
+        INSERT INTO mistakes_v3 SELECT * FROM mistakes;
+        DROP TABLE mistakes;
+        ALTER TABLE mistakes_v3 RENAME TO mistakes;
+        CREATE INDEX mistakes_kind ON mistakes (kind);
+        CREATE INDEX mistakes_logged_on ON mistakes (logged_on);
+        DROP TABLE review_cards;
+        """
+    )
+
+
 # Applied in order; the database's user_version records how many have run.
-_MIGRATIONS: tuple[str, ...] = (
+_MIGRATIONS: tuple[str | Callable[[sqlite3.Connection], None], ...] = (
     """
     CREATE TABLE IF NOT EXISTS review_cards (
         platform      TEXT    NOT NULL,
@@ -52,17 +126,29 @@ _MIGRATIONS: tuple[str, ...] = (
     CREATE INDEX mistakes_kind ON mistakes (kind);
     CREATE INDEX mistakes_logged_on ON mistakes (logged_on);
     """,
+    _move_to_fsrs,
 )
 
-_CARD_COLUMNS = "platform, problem_id, title, url, ease, interval_days, repetitions, due"
+_PARAMETERS_KEY = "fsrs_parameters"
+_RECORD_SQL = (
+    "SELECT c.platform, c.problem_id, c.title, c.url, c.fsrs, "
+    "(SELECT COUNT(*) FROM reviews r WHERE r.card_id = c.id) AS reviews FROM cards c"
+)
 
 
 def default_db_path() -> Path:
     return Path(os.environ.get(DB_PATH_ENV) or DEFAULT_DB_PATH)
 
 
-def _to_card(row: sqlite3.Row) -> ReviewCard:
-    return ReviewCard(**{**dict(row), "due": date.fromisoformat(row["due"])})
+def _to_record(row: sqlite3.Row) -> CardRecord:
+    return CardRecord(
+        platform=row["platform"],
+        problem_id=row["problem_id"],
+        title=row["title"],
+        url=row["url"],
+        card=Card.from_json(row["fsrs"]),
+        reviews=row["reviews"],
+    )
 
 
 def _to_entry(row: sqlite3.Row) -> MistakeEntry:
@@ -79,10 +165,28 @@ class ReviewStore:
     def __init__(self, path: Path) -> None:
         self._path = path
         path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
+        # Migrations rebuild tables, which foreign keys would block mid-way; they run
+        # on their own connection with enforcement off, each in one transaction.
+        conn = sqlite3.connect(path, autocommit=True)
+        try:
             applied = conn.execute("PRAGMA user_version").fetchone()[0]
-            for version, script in enumerate(_MIGRATIONS[applied:], start=applied + 1):
-                conn.executescript(f"BEGIN; {script} PRAGMA user_version = {version}; COMMIT;")
+            for version, step in enumerate(_MIGRATIONS[applied:], start=applied + 1):
+                conn.execute("BEGIN")
+                try:
+                    if callable(step):
+                        step(conn)
+                    else:
+                        conn.executescript(step)
+                    conn.execute(f"PRAGMA user_version = {version}")
+                    conn.execute("COMMIT")
+                except BaseException:
+                    # SQLite may already have rolled back (disk full, I/O error); a
+                    # failing ROLLBACK must not hide the error that caused it.
+                    with suppress(sqlite3.Error):
+                        conn.execute("ROLLBACK")
+                    raise
+        finally:
+            conn.close()
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -95,65 +199,101 @@ class ReviewStore:
         finally:
             conn.close()
 
-    @staticmethod
-    def _save_card(conn: sqlite3.Connection, card: ReviewCard) -> None:
-        conn.execute(
-            f"INSERT OR REPLACE INTO review_cards ({_CARD_COLUMNS}) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                card.platform,
-                card.problem_id,
-                card.title,
-                card.url,
-                card.ease,
-                card.interval_days,
-                card.repetitions,
-                card.due.isoformat(),
-            ),
-        )
-
-    def get(self, platform: str, problem_id: str) -> ReviewCard | None:
+    def get(self, platform: str, problem_id: str) -> CardRecord | None:
         with self._connect() as conn:
             row = conn.execute(
-                f"SELECT {_CARD_COLUMNS} FROM review_cards WHERE platform = ? AND problem_id = ?",
+                f"{_RECORD_SQL} WHERE c.platform = ? AND c.problem_id = ?",
                 (platform, problem_id),
             ).fetchone()
-        return _to_card(row) if row else None
-
-    def save(self, card: ReviewCard) -> None:
-        with self._connect() as conn:
-            self._save_card(conn, card)
+        return _to_record(row) if row else None
 
     def record_review(
-        self, card: ReviewCard, tags: Sequence[str], mistakes: Sequence[Mistake], on: date
+        self,
+        problem: Problem,
+        card: Card,
+        rating: Rating,
+        at: datetime,
+        mistakes: Sequence[Mistake],
     ) -> None:
-        """Save the rescheduled card and the mistakes made on it in one transaction."""
+        """Save the rescheduled card, the review and the mistakes made on it in one
+        transaction."""
 
         with self._connect() as conn:
-            self._save_card(conn, card)
+            conn.execute(
+                "INSERT INTO cards (platform, problem_id, title, url, fsrs, due) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (platform, problem_id) DO UPDATE "
+                "SET title = excluded.title, url = excluded.url, fsrs = excluded.fsrs, "
+                "due = excluded.due",
+                (
+                    problem.platform,
+                    problem.problem_id,
+                    problem.title,
+                    problem.url,
+                    card.to_json(),
+                    card.due.astimezone(UTC).isoformat(),
+                ),
+            )
+            conn.execute(
+                "INSERT INTO reviews (card_id, rating, reviewed_at) SELECT id, ?, ? FROM cards "
+                "WHERE platform = ? AND problem_id = ?",
+                (int(rating), at.astimezone(UTC).isoformat(), problem.platform, problem.problem_id),
+            )
             conn.executemany(
                 "INSERT INTO mistakes (platform, problem_id, tags, kind, note, logged_on) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 [
                     (
-                        card.platform,
-                        card.problem_id,
-                        json.dumps(list(tags)),
+                        problem.platform,
+                        problem.problem_id,
+                        json.dumps(problem.tags),
                         m.kind,
                         m.note,
-                        on.isoformat(),
+                        at.astimezone(UTC).date().isoformat(),
                     )
                     for m in mistakes
                 ],
             )
 
-    def due(self, on: date, limit: int) -> list[ReviewCard]:
+    def due(self, at: datetime) -> list[CardRecord]:
+        """Every card due by ``at``. One user's revision queue is small, and ranking it
+        by recall needs all of it."""
+
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT {_CARD_COLUMNS} FROM review_cards WHERE due <= ? ORDER BY due LIMIT ?",
-                (on.isoformat(), limit),
+                f"{_RECORD_SQL} WHERE c.due <= ? ORDER BY c.due",
+                (at.astimezone(UTC).isoformat(),),
             ).fetchall()
-        return [_to_card(row) for row in rows]
+        return [_to_record(row) for row in rows]
+
+    def review_logs(self) -> list[ReviewLog]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT card_id, rating, reviewed_at FROM reviews ORDER BY reviewed_at"
+            ).fetchall()
+        return [
+            ReviewLog(
+                card_id=row["card_id"],
+                rating=Rating(row["rating"]),
+                review_datetime=datetime.fromisoformat(row["reviewed_at"]),
+                review_duration=None,
+            )
+            for row in rows
+        ]
+
+    def parameters(self) -> list[float] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?", (_PARAMETERS_KEY,)
+            ).fetchone()
+        return list(json.loads(row["value"])) if row else None
+
+    def save_parameters(self, parameters: Sequence[float]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                (_PARAMETERS_KEY, json.dumps(list(parameters))),
+            )
 
     def mistake_kinds(self, since: date | None = None) -> list[MistakeKind]:
         where, params = self._filters(since=since)
@@ -186,7 +326,7 @@ class ReviewStore:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT m.platform, m.problem_id, c.title, c.url, m.tags, m.kind, m.note, "
-                "m.logged_on FROM mistakes m JOIN review_cards c "
+                "m.logged_on FROM mistakes m JOIN cards c "
                 "USING (platform, problem_id) "
                 f"{where} ORDER BY m.logged_on DESC, m.id DESC LIMIT ?",
                 (*params, limit),

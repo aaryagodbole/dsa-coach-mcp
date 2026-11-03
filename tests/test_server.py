@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, date, datetime
+import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import fsrs
 import pytest
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -15,7 +17,15 @@ from dsa_coach_mcp.platforms import ProblemNotFoundError, UserNotFoundError
 from dsa_coach_mcp.server import create_server
 from dsa_coach_mcp.store import ReviewStore
 
-TODAY = date(2026, 1, 1)
+NOW = datetime(2026, 1, 1, 9, tzinfo=UTC)
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.at = NOW
+
+    def __call__(self) -> datetime:
+        return self.at
 
 
 def make_problem(problem_id: str, tags: list[str]) -> Problem:
@@ -67,9 +77,14 @@ class FakeAdapter:
 
 
 @pytest.fixture
-def server(tmp_path: Path) -> MCPServer:
+def clock() -> Clock:
+    return Clock()
+
+
+@pytest.fixture
+def server(tmp_path: Path, clock: Clock) -> MCPServer:
     return create_server(
-        {"fake": FakeAdapter()}, ReviewStore(tmp_path / "coach.db"), today=lambda: TODAY
+        {"fake": FakeAdapter()}, ReviewStore(tmp_path / "coach.db"), now=clock, fuzz=False
     )
 
 
@@ -89,6 +104,8 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
         "search_problems",
         "log_review",
         "revisions_due",
+        "schedule_info",
+        "personalize_schedule",
         "mistake_kinds",
         "list_mistakes",
         "mistake_patterns",
@@ -145,12 +162,62 @@ async def test_platform_failures_reach_the_model_as_tool_errors(server: MCPServe
         await server.call_tool("get_profile", {"platform": "fake", "handle": "ghost"})
 
 
-async def test_logged_review_is_due_after_its_interval(server: MCPServer) -> None:
-    card = await call(server, "log_review", platform="fake", problem_id="p0", quality=5)
+async def test_a_review_is_scheduled_days_ahead_and_falls_due(
+    server: MCPServer, clock: Clock
+) -> None:
+    card = await call(server, "log_review", platform="fake", problem_id="p0", rating="good")
 
-    assert card["due"] == "2026-01-02"
-    assert (card["title"], card["url"]) == ("p0", "https://example.com/p0")
+    due = datetime.fromisoformat(card["due"])
+    assert due - NOW >= timedelta(days=1)
+    assert (card["title"], card["url"], card["reviews"]) == ("p0", "https://example.com/p0", 1)
     assert (await call(server, "revisions_due"))["result"] == []
+
+    clock.at = due
+    (overdue,) = (await call(server, "revisions_due"))["result"]
+    assert overdue["problem_id"] == "p0"
+    assert 0 < overdue["retrievability"] < 1
+
+
+async def test_an_easier_recall_waits_longer(server: MCPServer) -> None:
+    hard = await call(server, "log_review", platform="fake", problem_id="p0", rating="hard")
+    easy = await call(server, "log_review", platform="fake", problem_id="p1", rating="easy")
+
+    assert easy["due"] > hard["due"]
+
+
+async def test_revisions_lead_with_what_the_user_is_most_likely_to_forget(
+    server: MCPServer, clock: Clock
+) -> None:
+    await call(server, "log_review", platform="fake", problem_id="p0", rating="easy")
+    await call(server, "log_review", platform="fake", problem_id="p1", rating="again")
+
+    clock.at = NOW + timedelta(days=60)
+    due = (await call(server, "revisions_due"))["result"]
+
+    assert [c["problem_id"] for c in due] == ["p1", "p0"]
+    assert due[0]["retrievability"] < due[1]["retrievability"]
+
+
+async def test_schedule_info_reports_default_parameters_until_personalised(
+    server: MCPServer,
+) -> None:
+    await call(server, "log_review", platform="fake", problem_id="p0", rating="good")
+
+    info = await call(server, "schedule_info")
+
+    assert (info["personalised"], info["reviews"]) == (False, 1)
+    assert len(info["parameters"]) > 0
+
+
+async def test_personalising_without_the_optimizer_says_how_to_get_it(
+    server: MCPServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A None entry makes importing the module fail, as it does without the extra.
+    monkeypatch.setitem(sys.modules, "fsrs.optimizer", None)
+    monkeypatch.delitem(vars(fsrs), "Optimizer", raising=False)
+
+    with pytest.raises(ToolError, match=r"dsa-coach-mcp\[optimizer\]"):
+        await server.call_tool("personalize_schedule", {})
 
 
 @pytest.mark.parametrize("problem_id", ["  ", "no-such-problem"])
@@ -159,22 +226,22 @@ async def test_log_review_needs_a_problem_the_platform_has(
 ) -> None:
     with pytest.raises(ToolError):
         await server.call_tool(
-            "log_review", {"platform": "fake", "problem_id": problem_id, "quality": 5}
+            "log_review", {"platform": "fake", "problem_id": problem_id, "rating": "good"}
         )
 
     assert (await call(server, "revisions_due", limit=10))["result"] == []
 
 
 async def test_overlapping_reviews_each_count(server: MCPServer) -> None:
-    arguments = {"platform": "fake", "problem_id": "p0", "quality": 5}
+    arguments = {"platform": "fake", "problem_id": "p0", "rating": "good"}
 
     await asyncio.gather(*(server.call_tool("log_review", arguments) for _ in range(3)))
     card = await call(server, "log_review", **arguments)
 
-    assert card["repetitions"] == 4
+    assert card["reviews"] == 4
 
 
-REVIEW = {"platform": "fake", "problem_id": "p0", "quality": 2}
+REVIEW = {"platform": "fake", "problem_id": "p0", "rating": "hard"}
 
 
 async def test_mistakes_logged_with_a_review_feed_the_journal(server: MCPServer) -> None:
@@ -252,3 +319,33 @@ async def test_mistakes_can_be_read_for_one_problem(server: MCPServer) -> None:
     journal = (await call(server, "list_mistakes", platform="fake", problem_id="p0"))["result"]
 
     assert [m["note"] for m in journal] == ["on p0"]
+
+
+async def test_an_unfitted_result_is_not_saved_as_personal(
+    server: MCPServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fsrs.scheduler import DEFAULT_PARAMETERS
+
+    from dsa_coach_mcp import scheduling
+
+    monkeypatch.setattr(scheduling, "optimize", lambda logs: list(DEFAULT_PARAMETERS))
+    await call(server, "log_review", platform="fake", problem_id="p0", rating="good")
+
+    with pytest.raises(ToolError, match="too few"):
+        await server.call_tool("personalize_schedule", {})
+    assert (await call(server, "schedule_info"))["personalised"] is False
+
+
+async def test_the_most_at_risk_card_leads_even_beyond_the_limit(
+    server: MCPServer, clock: Clock
+) -> None:
+    # p0 falls due first but is better remembered; p1 falls due later and is shakier.
+    p0 = await call(server, "log_review", platform="fake", problem_id="p0", rating="good")
+    clock.at = NOW + timedelta(days=10)
+    p1 = await call(server, "log_review", platform="fake", problem_id="p1", rating="again")
+    assert p0["due"] < p1["due"]
+
+    clock.at = NOW + timedelta(days=40)
+    (first,) = (await call(server, "revisions_due", limit=1))["result"]
+
+    assert first["problem_id"] == "p1"

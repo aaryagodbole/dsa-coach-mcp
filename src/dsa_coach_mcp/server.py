@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
 import httpx
@@ -15,7 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import srs
+from . import scheduling
 from .models import (
     Mistake,
     MistakeEntry,
@@ -26,18 +26,21 @@ from .models import (
     Problem,
     Profile,
     ReviewCard,
+    ScheduleInfo,
 )
 from .platforms import PlatformAdapter, PlatformError
-from .store import ReviewStore
+from .scheduling import ReviewRating
+from .store import CardRecord, ReviewStore
 
 _INSTRUCTIONS = """\
 Coach DSA practice from the user's own history on competitive-programming platforms.
 Call list_platforms first to learn each platform's tags and levels, get_profile to see
 where the user stands, and search_problems with filters you chose from that data.
 After the user solves or revisits a problem, record how well they recalled it with
-log_review, together with every mistake they made: label each mistake with a short
-kind, reusing a label from mistake_kinds whenever one fits. revisions_due lists what to
-revise today; mistake_patterns and list_mistakes show where the user keeps going wrong."""
+log_review (again, hard, good or easy), together with every mistake they made: label
+each mistake with a short kind, reusing a label from mistake_kinds whenever one fits.
+revisions_due lists what to revise now, least likely to be remembered first;
+mistake_patterns and list_mistakes show where the user keeps going wrong."""
 
 _READ_REMOTE = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 _READ_LOCAL = ToolAnnotations(read_only_hint=True, open_world_hint=False)
@@ -61,7 +64,8 @@ async def _platform_errors(platform: str) -> AsyncIterator[None]:
 def create_server(
     adapters: Mapping[str, PlatformAdapter],
     store: ReviewStore,
-    today: Callable[[], date] = date.today,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    fuzz: bool = True,
 ) -> MCPServer:
     server = MCPServer(name="dsa-coach", instructions=_INSTRUCTIONS)
     # Read, reschedule and write one card at a time, so overlapping reviews never
@@ -73,8 +77,29 @@ def create_server(
 
         if not days:
             return None
-        now = today()
-        return now - timedelta(days=min(days, (now - date.min).days))
+        today = now().date()
+        return today - timedelta(days=min(days, (today - date.min).days))
+
+    async def scheduler() -> scheduling.Scheduler:
+        """Built once per request: the parameters live in SQLite, read off the loop."""
+
+        parameters = await asyncio.to_thread(store.parameters)
+        return scheduling.make_scheduler(parameters, fuzz=fuzz)
+
+    def to_card(record: CardRecord, at: datetime, fsrs: scheduling.Scheduler) -> ReviewCard:
+        card = record.card
+        reviewed = card.last_review is not None
+        return ReviewCard(
+            platform=record.platform,
+            problem_id=record.problem_id,
+            title=record.title,
+            url=record.url,
+            due=card.due,
+            stability=card.stability,
+            difficulty=card.difficulty,
+            retrievability=fsrs.get_card_retrievability(card, at) if reviewed else None,
+            reviews=record.reviews,
+        )
 
     def adapter_for(platform: str) -> PlatformAdapter:
         adapter = adapters.get(platform)
@@ -141,11 +166,14 @@ def create_server(
     async def log_review(
         platform: str,
         problem_id: NonBlank,
-        quality: Annotated[int, Field(ge=srs.MIN_QUALITY, le=srs.MAX_QUALITY)],
+        rating: ReviewRating,
         mistakes: list[Mistake] | None = None,
     ) -> ReviewCard:
-        """Record how well the user recalled a problem (0 = could not, 5 = instantly),
-        schedule the next revision, and journal any mistakes made on the way.
+        """Record how well the user recalled a problem, schedule the next revision with
+        FSRS, and journal any mistakes made on the way.
+
+        rating: again (could not solve it), hard (solved with real difficulty), good
+        (solved after some thought) or easy (solved at once).
 
         The problem's title, link and tags are read from the platform itself. Give each
         mistake a short kind, reusing an existing one from mistake_kinds when it fits, and
@@ -155,38 +183,67 @@ def create_server(
         async with _platform_errors(platform):
             problem = await adapter.problem(problem_id)
         async with review_lock:
+            at = now()
             previous = await asyncio.to_thread(store.get, platform, problem.problem_id)
-            schedule = srs.review(
-                srs.Schedule(
-                    previous.ease, previous.interval_days, previous.repetitions, previous.due
-                )
-                if previous
-                else None,
-                quality,
-                today(),
-            )
-            card = ReviewCard(
-                platform=platform,
-                problem_id=problem.problem_id,
-                title=problem.title,
-                url=problem.url,
-                ease=schedule.ease,
-                interval_days=schedule.interval_days,
-                repetitions=schedule.repetitions,
-                due=schedule.due,
-            )
+            card = previous.card if previous else scheduling.Card()
+            fsrs = await scheduler()
+            card, _ = scheduling.review(fsrs, card, rating, at)
             await asyncio.to_thread(
-                store.record_review, card, problem.tags, mistakes or [], today()
+                store.record_review,
+                problem,
+                card,
+                scheduling.to_rating(rating),
+                at,
+                mistakes or [],
             )
-        return card
+            record = await asyncio.to_thread(store.get, platform, problem.problem_id)
+        assert record is not None
+        return to_card(record, at, fsrs)
 
     @server.tool(annotations=_READ_LOCAL)
     async def revisions_due(
         limit: Annotated[int, Field(ge=1, le=100)] = 10,
     ) -> list[ReviewCard]:
-        """Problems due for revision today or overdue, oldest first."""
+        """Problems due for revision now, the one the user is least likely to recall
+        first."""
 
-        return await asyncio.to_thread(store.due, today(), limit)
+        at = now()
+        fsrs = await scheduler()
+        records = await asyncio.to_thread(store.due, at)
+        cards = [to_card(record, at, fsrs) for record in records]
+        ranked = sorted(cards, key=lambda c: (c.retrievability is not None, c.retrievability))
+        return ranked[:limit]
+
+    @server.tool(annotations=_READ_LOCAL)
+    async def schedule_info() -> ScheduleInfo:
+        """The FSRS parameters in use, whether they were fitted to this user's own
+        reviews, and how many reviews are logged."""
+
+        parameters = await asyncio.to_thread(store.parameters)
+        logs = await asyncio.to_thread(store.review_logs)
+        return ScheduleInfo(
+            personalised=parameters is not None,
+            reviews=len(logs),
+            parameters=list((await scheduler()).parameters),
+        )
+
+    @server.tool(annotations=_WRITE_LOCAL)
+    async def personalize_schedule() -> ScheduleInfo:
+        """Fit the FSRS parameters to this user's own review history, so revisions are
+        timed to how fast they personally forget. Needs the optimizer extra."""
+
+        logs = await asyncio.to_thread(store.review_logs)
+        try:
+            parameters = await asyncio.to_thread(scheduling.optimize, logs)
+        except RuntimeError as exc:
+            raise ToolError(str(exc)) from exc
+        if scheduling.is_default(parameters):
+            raise ToolError(
+                f"FSRS kept its default parameters: {len(logs)} reviews are too few to fit "
+                "this user yet. Keep reviewing and try again later."
+            )
+        await asyncio.to_thread(store.save_parameters, parameters)
+        return ScheduleInfo(personalised=True, reviews=len(logs), parameters=parameters)
 
     @server.tool(annotations=_READ_LOCAL)
     async def mistake_kinds() -> list[MistakeKind]:
@@ -254,7 +311,8 @@ def create_server(
             "before. Ask me one question at a "
             "time about how I would approach it and what I must not miss this time, "
             "built from those past mistakes, without giving the answer. After I reply, "
-            "rate my recall from 0 to 5, then record it with log_review, including any "
+            "rate my recall as again, hard, good or easy, then record it with log_review, "
+            "including any "
             "new mistake."
         )
 
