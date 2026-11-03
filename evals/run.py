@@ -50,7 +50,7 @@ async def run_task(
 ) -> tuple[list[ToolCall], dict[str, int], str]:
     with tempfile.TemporaryDirectory() as tmp:
         server, clock = build_server(Path(tmp) / "coach.db")
-        if "seed" in task:
+        if task.get("seed") is not None:
             await SEEDS[task["seed"]](server, clock)
         async with Client(server) as mcp:
             tools = to_claude_tools((await mcp.list_tools()).tools)
@@ -146,7 +146,7 @@ async def main_async(args: argparse.Namespace) -> int:
             }
         )
         # Written after every task, so a run that dies midway keeps what it paid for.
-        write_results(args, summarise(grades), totals, records)
+        await asyncio.to_thread(write_results, args, summarise(grades), totals, records)
 
     summary = summarise(grades)
     print(
