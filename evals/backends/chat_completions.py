@@ -91,6 +91,8 @@ class ChatCompletionsConversation:
             raise BackendError(f"{b._url} answered with malformed usage: {usage!r}")
         return Turn(
             text=message.get("content") or "",
+            # The format's own refusal field, set when the model declines the request.
+            refused=bool(message.get("refusal")),
             tool_requests=requests,
             usage=Usage(
                 input=_token_count(usage, "prompt_tokens"),

@@ -147,3 +147,12 @@ async def test_null_token_counts_count_as_zero() -> None:
     turn = await backend.start("s", "p", TOOLS).next_turn()
 
     assert (turn.usage.input, turn.usage.output) == (0, 0)
+
+
+async def test_a_refusal_message_is_a_refused_turn() -> None:
+    body = reply({"role": "assistant", "content": None, "refusal": "I can't help with that."})
+    backend = ChatCompletionsBackend(server([body], []), "http://localhost:1/v1", "m")
+
+    turn = await backend.start("s", "p", TOOLS).next_turn()
+
+    assert turn.refused
