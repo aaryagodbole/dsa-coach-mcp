@@ -206,7 +206,7 @@ The server and tools need no changes.
 ## Evals
 
 Unit tests check the code; [`evals/`](evals/) checks whether a model can actually
-coach with these tools. Claude drives the real server over the MCP protocol, against a
+coach with these tools. A model drives the real server over the MCP protocol, against a
 fixture world (one practice platform, a seeded history, a fixed clock), on tasks such
 as planning from a profile, logging a review with its mistakes, reusing an existing
 mistake label, recording a problem from another platform, and staying silent when no
@@ -217,14 +217,21 @@ with predicates on their arguments, the tools it must not touch, and a call budg
 reports pass rate, tool-selection accuracy, argument accuracy, tool error rate, calls
 per task and token usage.
 
+The model is configuration, not code. Any API that speaks the chat completions format
+works, whether a hosted free tier, a paid API or a model served on your own machine:
+
 ```bash
-uv run --all-groups python -m evals.run --model claude-opus-5-5 --effort medium
+EVALS_BASE_URL=<api base url> EVALS_MODEL=<model> EVALS_API_KEY=<key, if needed> \
+  uv run python -m evals.run
 ```
 
-It calls the Claude API, so it costs money and never runs on its own: run it locally,
-or start the **Agent evals** workflow from the Actions tab (it needs an
-`ANTHROPIC_API_KEY` repository secret). The graders, the fixture and the agent loop
-are unit-tested in CI without the API.
+The loop talks to models through a small `AgentBackend` interface
+([`evals/backends/base.py`](evals/backends/base.py)); an API with a different wire
+format is one more backend module. Runs never start on their own: run it locally, or
+start the **Agent evals** workflow from the Actions tab after setting the
+`EVALS_BASE_URL` and `EVALS_MODEL` repository variables (and an `EVALS_API_KEY` secret
+if your API needs one). The graders, the fixture, the loop and the backend are
+unit-tested in CI without calling any model.
 
 ## Development
 

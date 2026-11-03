@@ -37,9 +37,6 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.2",
 ]
-evals = [
-    "anthropic>=2.3.0",
-]
 
 [tool.ruff]
 line-length = 100

@@ -1,17 +1,12 @@
 name: Agent evals
 
-# Calls the Claude API, so it never runs on its own: start it from the Actions tab.
+# Calls a model API, so it never runs on its own: start it from the Actions tab.
+# Configure the model with repository variables, never in code:
+#   EVALS_BASE_URL  the API base, before /chat/completions
+#   EVALS_MODEL     the model name as that API expects it
+# and, if the API needs a key, the repository secret EVALS_API_KEY.
 on:
   workflow_dispatch:
-    inputs:
-      model:
-        description: Claude model that drives the tools
-        default: claude-opus-5-5
-      effort:
-        description: Effort level
-        default: medium
-        type: choice
-        options: [low, medium, high, xhigh, max]
 
 permissions:
   contents: read
@@ -30,15 +25,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
-      - run: uv sync --locked --all-groups
+      - run: uv sync --locked
       - name: Run agent evals
         # Shorter than the job's limit, so a timed-out run still uploads its results.
         timeout-minutes: 25
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MODEL: ${{ inputs.model }}
-          EFFORT: ${{ inputs.effort }}
-        run: uv run --all-groups python -m evals.run --model "$MODEL" --effort "$EFFORT" --out evals-results.json
+          EVALS_BASE_URL: ${{ vars.EVALS_BASE_URL }}
+          EVALS_MODEL: ${{ vars.EVALS_MODEL }}
+          EVALS_API_KEY: ${{ secrets.EVALS_API_KEY }}
+        run: uv run python -m evals.run --out evals-results.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
