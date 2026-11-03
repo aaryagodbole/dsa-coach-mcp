@@ -293,13 +293,15 @@ class ReviewStore:
 
     def save_problem(self, problem: Problem) -> Problem:
         """Record a problem reported from a platform with no adapter. Recording the same
-        URL again updates it."""
+        problem again (even from a slightly different URL) updates it, and its review
+        card, in one transaction."""
 
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO problems (platform, problem_id, title, url, tags, level) "
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (url) DO UPDATE SET "
-                "title = excluded.title, tags = excluded.tags, level = excluded.level",
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (platform, problem_id) DO UPDATE SET "
+                "title = excluded.title, url = excluded.url, tags = excluded.tags, "
+                "level = excluded.level",
                 (
                     problem.platform,
                     problem.problem_id,
@@ -308,6 +310,10 @@ class ReviewStore:
                     json.dumps(problem.tags),
                     problem.level,
                 ),
+            )
+            conn.execute(
+                "UPDATE cards SET title = ?, url = ? WHERE platform = ? AND problem_id = ?",
+                (problem.title, problem.url, problem.platform, problem.problem_id),
             )
         found = self.problem(problem.platform, problem.problem_id)
         assert found is not None

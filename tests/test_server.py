@@ -441,3 +441,68 @@ async def test_reviewing_an_unrecorded_problem_says_to_record_it(server: MCPServ
             "log_review",
             {"platform": "codechef.com", "problem_id": "problems/X", "rating": "good"},
         )
+
+
+async def test_recording_the_same_problem_from_a_variant_url_updates_it(
+    server: MCPServer,
+) -> None:
+    first = await call(server, "record_problem", **HACKERRANK)
+    await call(
+        server,
+        "log_review",
+        platform=first["platform"],
+        problem_id=first["problem_id"],
+        rating="good",
+    )
+
+    updated = await call(
+        server,
+        "record_problem",
+        **{**HACKERRANK, "url": HACKERRANK["url"] + "/", "title": "Ransom Note (fixed title)"},
+    )
+
+    assert updated["problem_id"] == first["problem_id"]
+    assert updated["url"].endswith("/")
+    progress = (await call(server, "progress"))["result"]
+    assert progress[0]["problems"] == 1
+
+
+async def test_a_recorded_title_change_reaches_the_review_card(
+    server: MCPServer, clock: Clock
+) -> None:
+    problem = await call(server, "record_problem", **HACKERRANK)
+    await call(
+        server,
+        "log_review",
+        platform=problem["platform"],
+        problem_id=problem["problem_id"],
+        rating="again",
+    )
+    await call(server, "record_problem", **{**HACKERRANK, "title": "Renamed"})
+
+    clock.at = NOW + timedelta(days=30)
+    (card,) = (await call(server, "revisions_due"))["result"]
+
+    assert card["title"] == "Renamed"
+
+
+async def test_one_platform_down_leaves_the_others_listed(tmp_path: Path) -> None:
+    class DownAdapter(FakeAdapter):
+        name = "down"
+
+        async def describe(self) -> PlatformInfo:
+            raise UserNotFoundError("upstream timeout")
+
+    server = create_server(
+        {"fake": FakeAdapter(), "down": DownAdapter()},
+        ReviewStore(tmp_path / "c.db"),
+        now=Clock(),
+        fuzz=False,
+    )
+    await call(server, "record_problem", **HACKERRANK)
+
+    platforms = {p["name"]: p for p in (await call(server, "list_platforms"))["result"]}
+
+    assert platforms["fake"]["tags"]
+    assert platforms["down"]["limitations"] == ["Unavailable right now: upstream timeout"]
+    assert "hackerrank.com" in platforms

@@ -118,8 +118,26 @@ def create_server(
     async def list_platforms() -> list[PlatformInfo]:
         """Connected platforms, with the tags and levels each one accepts as filters."""
 
-        async with _platform_errors("a platform"):
-            infos = list(await asyncio.gather(*(a.describe() for a in adapters.values())))
+        # Each platform answers on its own: one being down must not hide the others or
+        # the platforms recorded locally.
+        described = await asyncio.gather(
+            *(a.describe() for a in adapters.values()), return_exceptions=True
+        )
+        infos: list[PlatformInfo] = []
+        for adapter, info in zip(adapters.values(), described, strict=True):
+            if isinstance(info, PlatformInfo):
+                infos.append(info)
+            elif isinstance(info, (PlatformError, httpx.HTTPError)):
+                infos.append(
+                    PlatformInfo(
+                        name=adapter.name,
+                        tags=[],
+                        levels=[],
+                        limitations=[f"Unavailable right now: {info}"],
+                    )
+                )
+            else:
+                raise info
         reported: dict[str, list[Problem]] = {}
         for problem in await asyncio.to_thread(store.reported_problems):
             reported.setdefault(problem.platform, []).append(problem)
