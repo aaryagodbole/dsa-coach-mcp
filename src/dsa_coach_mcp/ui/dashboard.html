@@ -32,6 +32,7 @@
   .row { display: grid; grid-template-columns: 1fr 120px 44px; gap: 10px; align-items: center; }
   .row a { color: var(--fg); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row a:hover { color: var(--accent); }
+  .row .note { grid-column: 1 / -1; overflow-wrap: anywhere; }
   .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
   .bar span { display: block; height: 100%; }
   .pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
@@ -88,7 +89,10 @@
       if (!safe) return;
       const failed = () => {
         // Leave the address visible so the user can still open it themselves.
-        a.textContent = `${text} · couldn't open, ${url}`;
+        const row = a.parentElement;
+        if (!row || row.querySelector(".note")) return;
+        row.append(el("div", { class: "note empty" }, `Couldn't open this link: ${url}`));
+        reportSize();
       };
       request("ui/open-link", { url })
         .then((result) => { if (result && result.isError) failed(); })
