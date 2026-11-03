@@ -39,6 +39,9 @@ window.addEventListener("message", (e) => {{
     view.contentWindow.postMessage({{jsonrpc: "2.0", id: m.id, result: {{
       protocolVersion: "2026-01-26", hostInfo: {{name: "preview", version: "1"}},
       hostCapabilities: {{}}, hostContext: {{theme: "{theme}"}}}}}}, "*");
+  }} else if (m.method === "ui/open-link") {{
+    window.open(m.params.url, "_blank", "noopener");
+    view.contentWindow.postMessage({{jsonrpc: "2.0", id: m.id, result: {{}}}}, "*");
   }} else if (m.method === "ui/notifications/initialized") {{
     view.contentWindow.postMessage({{jsonrpc: "2.0",
       method: "ui/notifications/tool-result", params: result}}, "*");

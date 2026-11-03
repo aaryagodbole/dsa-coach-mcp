@@ -528,6 +528,26 @@ async def test_dashboard_is_an_mcp_app_linked_from_its_tool(server: MCPServer) -
     assert "<link" not in html
 
 
+async def test_dashboard_initializes_with_the_mcp_apps_handshake(server: MCPServer) -> None:
+    import re
+
+    from mcp import Client
+
+    from dsa_coach_mcp.server import DASHBOARD_URI
+
+    async with Client(server) as client:
+        resource = (await client.read_resource(DASHBOARD_URI)).contents[0]
+    html = resource.text  # type: ignore[union-attr]
+
+    # McpUiInitializeRequest params are exactly protocolVersion, appInfo and appCapabilities.
+    params = re.search(r'request\("ui/initialize", \{(.*?)\n  \}\)', html, re.S)
+    assert params
+    keys = re.findall(r"^\s{4}(\w+):", params.group(1), re.M)
+    assert keys == ["protocolVersion", "appInfo", "appCapabilities"]
+    # Sandboxed views can't open windows, so links go through the host.
+    assert 'request("ui/open-link", { url })' in html
+
+
 async def test_dashboard_reports_progress_due_cards_and_patterns(
     server: MCPServer, clock: Clock
 ) -> None:
