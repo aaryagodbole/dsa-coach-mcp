@@ -10,6 +10,11 @@ All notable changes to this project are documented here. The format follows
 
 - Listed in the official MCP Registry as `io.github.aaryagodbole/dsa-coach-mcp`: the
   release workflow publishes `server.json` after PyPI, authenticated with GitHub OIDC.
+- Any platform: `record_problem` records a problem from a platform with no adapter, as
+  read from its page (for example through Playwright MCP's browser extension). The
+  platform is the URL's host; such problems are marked `reported`, and `list_platforms`
+  lists them. `progress` reports reviewed problems, reviews logged and problems due
+  now, per platform.
 - `schedule_info` and `personalize_schedule`: inspect the FSRS parameters, and fit them
   to the user's own review history with the `optimizer` extra. A fit that leaves FSRS's
   defaults unchanged (too little history) is reported and not saved.

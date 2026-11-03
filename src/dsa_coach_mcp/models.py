@@ -16,6 +16,9 @@ class Problem(BaseModel):
     tags: list[str] = Field(default_factory=list)
     # The platform's own grade for it ("Medium", "1400"); each platform grades differently.
     level: str | None = None
+    # "platform" when read from the platform's API; "reported" when an MCP client
+    # recorded it from a page it read, for platforms with no adapter.
+    source: str = "platform"
 
 
 class Submission(BaseModel):
@@ -44,6 +47,7 @@ class PlatformInfo(BaseModel):
     tags: list[str]
     levels: list[str]
     limitations: list[str] = Field(default_factory=list)
+    source: str = "platform"
 
 
 class ReviewCard(BaseModel):
@@ -59,6 +63,14 @@ class ReviewCard(BaseModel):
     # FSRS's estimate of the chance the user recalls it right now.
     retrievability: float | None = None
     reviews: int = 0
+
+
+class PlatformProgress(BaseModel):
+    platform: str
+    source: str
+    problems: int
+    reviews: int
+    due_now: int
 
 
 class ScheduleInfo(BaseModel):

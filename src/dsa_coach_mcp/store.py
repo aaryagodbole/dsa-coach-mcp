@@ -127,6 +127,17 @@ _MIGRATIONS: tuple[str | Callable[[sqlite3.Connection], None], ...] = (
     CREATE INDEX mistakes_logged_on ON mistakes (logged_on);
     """,
     _move_to_fsrs,
+    """
+    CREATE TABLE problems (
+        platform   TEXT NOT NULL,
+        problem_id TEXT NOT NULL,
+        title      TEXT NOT NULL,
+        url        TEXT NOT NULL UNIQUE,
+        tags       TEXT NOT NULL,
+        level      TEXT,
+        PRIMARY KEY (platform, problem_id)
+    );
+    """,
 )
 
 _PARAMETERS_KEY = "fsrs_parameters"
@@ -279,6 +290,69 @@ class ReviewStore:
             )
             for row in rows
         ]
+
+    def save_problem(self, problem: Problem) -> Problem:
+        """Record a problem reported from a platform with no adapter. Recording the same
+        problem again (even from a slightly different URL) updates it, and its review
+        card, in one transaction."""
+
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO problems (platform, problem_id, title, url, tags, level) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (platform, problem_id) DO UPDATE SET "
+                "title = excluded.title, url = excluded.url, tags = excluded.tags, "
+                "level = excluded.level",
+                (
+                    problem.platform,
+                    problem.problem_id,
+                    problem.title,
+                    problem.url,
+                    json.dumps(problem.tags),
+                    problem.level,
+                ),
+            )
+            conn.execute(
+                "UPDATE cards SET title = ?, url = ? WHERE platform = ? AND problem_id = ?",
+                (problem.title, problem.url, problem.platform, problem.problem_id),
+            )
+        found = self.problem(problem.platform, problem.problem_id)
+        assert found is not None
+        return found
+
+    def problem(self, platform: str, problem_id: str) -> Problem | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT platform, problem_id, title, url, tags, level FROM problems "
+                "WHERE platform = ? AND problem_id = ?",
+                (platform, problem_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return Problem(**{**dict(row), "tags": json.loads(row["tags"]), "source": "reported"})
+
+    def reported_problems(self) -> list[Problem]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT platform, problem_id, title, url, tags, level FROM problems "
+                "ORDER BY platform, problem_id"
+            ).fetchall()
+        return [
+            Problem(**{**dict(row), "tags": json.loads(row["tags"]), "source": "reported"})
+            for row in rows
+        ]
+
+    def progress(self, at: datetime) -> list[tuple[str, int, int, int]]:
+        """Per platform: problems reviewed, reviews logged, and problems due now."""
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT c.platform, COUNT(*) AS problems, "
+                "SUM((SELECT COUNT(*) FROM reviews r WHERE r.card_id = c.id)) AS reviews, "
+                "SUM(c.due <= ?) AS due_now FROM cards c GROUP BY c.platform "
+                "ORDER BY c.platform",
+                (at.astimezone(UTC).isoformat(),),
+            ).fetchall()
+        return [(r["platform"], r["problems"], r["reviews"], r["due_now"]) for r in rows]
 
     def parameters(self) -> list[float] | None:
         with self._connect() as conn:

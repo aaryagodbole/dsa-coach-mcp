@@ -41,6 +41,7 @@ def make_problem(problem_id: str, tags: list[str]) -> Problem:
 
 class FakeAdapter:
     name = "fake"
+    hosts: tuple[str, ...] = ("example.com",)
 
     def __init__(self) -> None:
         # The last problem carries a tag the platform's own tag list leaves out, as
@@ -106,6 +107,8 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
         "revisions_due",
         "schedule_info",
         "personalize_schedule",
+        "record_problem",
+        "progress",
         "mistake_kinds",
         "list_mistakes",
         "mistake_patterns",
@@ -349,3 +352,157 @@ async def test_the_most_at_risk_card_leads_even_beyond_the_limit(
     (first,) = (await call(server, "revisions_due", limit=1))["result"]
 
     assert first["problem_id"] == "p1"
+
+
+HACKERRANK = {
+    "url": "https://www.hackerrank.com/challenges/ctci-ransom-note/problem",
+    "title": "Hash Tables: Ransom Note",
+    "tags": ["hash-tables", "hash-tables"],
+    "level": "Easy",
+}
+
+
+async def test_any_platform_problem_is_recorded_and_reviewed(server: MCPServer) -> None:
+    problem = await call(server, "record_problem", **HACKERRANK)
+
+    assert (problem["platform"], problem["problem_id"]) == (
+        "hackerrank.com",
+        "challenges/ctci-ransom-note/problem",
+    )
+    assert (problem["tags"], problem["source"]) == (["hash-tables"], "reported")
+
+    card = await call(
+        server,
+        "log_review",
+        platform=problem["platform"],
+        problem_id=problem["problem_id"],
+        rating="hard",
+        mistakes=[{"kind": "k", "note": "counted the wrong string"}],
+    )
+    platforms = (await call(server, "list_platforms"))["result"]
+    progress = (await call(server, "progress"))["result"]
+    journal = (await call(server, "list_mistakes", platform="hackerrank.com"))["result"]
+
+    assert card["title"] == "Hash Tables: Ransom Note"
+    reported = next(p for p in platforms if p["name"] == "hackerrank.com")
+    assert (reported["source"], reported["tags"], reported["levels"]) == (
+        "reported",
+        ["hash-tables"],
+        ["Easy"],
+    )
+    assert progress == [
+        {
+            "platform": "hackerrank.com",
+            "source": "reported",
+            "problems": 1,
+            "reviews": 1,
+            "due_now": 0,
+        }
+    ]
+    assert journal[0]["tags"] == ["hash-tables"]
+
+
+async def test_recording_the_same_url_again_updates_it(server: MCPServer) -> None:
+    await call(server, "record_problem", **HACKERRANK)
+    updated = await call(server, "record_problem", **{**HACKERRANK, "tags": ["strings"]})
+
+    assert updated["tags"] == ["strings"]
+    assert (
+        len(
+            [
+                p
+                for p in (await call(server, "list_platforms"))["result"]
+                if p["source"] == "reported"
+            ]
+        )
+        == 1
+    )
+
+
+async def test_a_host_with_an_adapter_is_sent_to_its_adapter(server: MCPServer) -> None:
+    with pytest.raises(ToolError, match="platform 'fake'"):
+        await server.call_tool("record_problem", {"url": "https://example.com/p0", "title": "p0"})
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"url": "ftp://x.org/p"}, {"url": "https://x.org/"}, {"title": " "}, {"tags": [""]}],
+)
+async def test_record_problem_rejects_unusable_input(
+    server: MCPServer, bad: dict[str, Any]
+) -> None:
+    with pytest.raises(ToolError):
+        await server.call_tool("record_problem", {**HACKERRANK, **bad})
+
+
+async def test_reviewing_an_unrecorded_problem_says_to_record_it(server: MCPServer) -> None:
+    with pytest.raises(ToolError, match="record_problem"):
+        await server.call_tool(
+            "log_review",
+            {"platform": "codechef.com", "problem_id": "problems/X", "rating": "good"},
+        )
+
+
+async def test_recording_the_same_problem_from_a_variant_url_updates_it(
+    server: MCPServer,
+) -> None:
+    first = await call(server, "record_problem", **HACKERRANK)
+    await call(
+        server,
+        "log_review",
+        platform=first["platform"],
+        problem_id=first["problem_id"],
+        rating="good",
+    )
+
+    updated = await call(
+        server,
+        "record_problem",
+        **{**HACKERRANK, "url": HACKERRANK["url"] + "/", "title": "Ransom Note (fixed title)"},
+    )
+
+    assert updated["problem_id"] == first["problem_id"]
+    assert updated["url"].endswith("/")
+    progress = (await call(server, "progress"))["result"]
+    assert progress[0]["problems"] == 1
+
+
+async def test_a_recorded_title_change_reaches_the_review_card(
+    server: MCPServer, clock: Clock
+) -> None:
+    problem = await call(server, "record_problem", **HACKERRANK)
+    await call(
+        server,
+        "log_review",
+        platform=problem["platform"],
+        problem_id=problem["problem_id"],
+        rating="again",
+    )
+    await call(server, "record_problem", **{**HACKERRANK, "title": "Renamed"})
+
+    clock.at = NOW + timedelta(days=30)
+    (card,) = (await call(server, "revisions_due"))["result"]
+
+    assert card["title"] == "Renamed"
+
+
+async def test_one_platform_down_leaves_the_others_listed(tmp_path: Path) -> None:
+    class DownAdapter(FakeAdapter):
+        name = "down"
+
+        async def describe(self) -> PlatformInfo:
+            raise UserNotFoundError("upstream timeout")
+
+    server = create_server(
+        {"fake": FakeAdapter(), "down": DownAdapter()},
+        ReviewStore(tmp_path / "c.db"),
+        now=Clock(),
+        fuzz=False,
+    )
+    await call(server, "record_problem", **HACKERRANK)
+
+    platforms = {p["name"]: p for p in (await call(server, "list_platforms"))["result"]}
+
+    assert platforms["fake"]["tags"]
+    assert platforms["down"]["limitations"] == ["Unavailable right now: upstream timeout"]
+    assert "hackerrank.com" in platforms

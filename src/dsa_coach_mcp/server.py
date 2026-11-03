@@ -8,12 +8,13 @@ from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
+from urllib.parse import urlsplit
 
 import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import AnyHttpUrl, Field
 
 from . import scheduling
 from .models import (
@@ -23,6 +24,7 @@ from .models import (
     MistakePatterns,
     NonBlank,
     PlatformInfo,
+    PlatformProgress,
     Problem,
     Profile,
     ReviewCard,
@@ -40,7 +42,9 @@ After the user solves or revisits a problem, record how well they recalled it wi
 log_review (again, hard, good or easy), together with every mistake they made: label
 each mistake with a short kind, reusing a label from mistake_kinds whenever one fits.
 revisions_due lists what to revise now, least likely to be remembered first;
-mistake_patterns and list_mistakes show where the user keeps going wrong."""
+mistake_patterns and list_mistakes show where the user keeps going wrong.
+For a platform with no adapter, read the problem page (for example with a browser MCP
+server) and call record_problem with its URL, title and tags before log_review."""
 
 _READ_REMOTE = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 _READ_LOCAL = ToolAnnotations(read_only_hint=True, open_world_hint=False)
@@ -101,6 +105,9 @@ def create_server(
             reviews=record.reviews,
         )
 
+    def adapter_for_host(host: str) -> PlatformAdapter | None:
+        return next((a for a in adapters.values() if host in a.hosts), None)
+
     def adapter_for(platform: str) -> PlatformAdapter:
         adapter = adapters.get(platform)
         if adapter is None:
@@ -111,8 +118,43 @@ def create_server(
     async def list_platforms() -> list[PlatformInfo]:
         """Connected platforms, with the tags and levels each one accepts as filters."""
 
-        async with _platform_errors("a platform"):
-            return list(await asyncio.gather(*(a.describe() for a in adapters.values())))
+        # Each platform answers on its own: one being down must not hide the others or
+        # the platforms recorded locally.
+        described = await asyncio.gather(
+            *(a.describe() for a in adapters.values()), return_exceptions=True
+        )
+        infos: list[PlatformInfo] = []
+        for adapter, info in zip(adapters.values(), described, strict=True):
+            if isinstance(info, PlatformInfo):
+                infos.append(info)
+            elif isinstance(info, (PlatformError, httpx.HTTPError)):
+                infos.append(
+                    PlatformInfo(
+                        name=adapter.name,
+                        tags=[],
+                        levels=[],
+                        limitations=[f"Unavailable right now: {info}"],
+                    )
+                )
+            else:
+                raise info
+        reported: dict[str, list[Problem]] = {}
+        for problem in await asyncio.to_thread(store.reported_problems):
+            reported.setdefault(problem.platform, []).append(problem)
+        infos += [
+            PlatformInfo(
+                name=name,
+                tags=sorted({tag for p in problems for tag in p.tags}),
+                levels=sorted({p.level for p in problems if p.level}),
+                limitations=[
+                    "Problems recorded from pages read by the MCP client; not checked "
+                    "against the platform, which has no adapter here."
+                ],
+                source="reported",
+            )
+            for name, problems in sorted(reported.items())
+        ]
+        return infos
 
     @server.tool(annotations=_READ_REMOTE)
     async def get_profile(
@@ -179,9 +221,18 @@ def create_server(
         mistake a short kind, reusing an existing one from mistake_kinds when it fits, and
         a note on what went wrong in the user's own words."""
 
-        adapter = adapter_for(platform)
-        async with _platform_errors(platform):
-            problem = await adapter.problem(problem_id)
+        if platform in adapters:
+            async with _platform_errors(platform):
+                problem = await adapters[platform].problem(problem_id)
+        else:
+            reported = await asyncio.to_thread(store.problem, platform, problem_id)
+            if reported is None:
+                raise ToolError(
+                    f"No problem '{problem_id}' recorded for {platform}. Platforms with an "
+                    f"adapter: {sorted(adapters)}; for any other, call record_problem with "
+                    "the problem's URL first."
+                )
+            problem = reported
         async with review_lock:
             at = now()
             previous = await asyncio.to_thread(store.get, platform, problem.problem_id)
@@ -213,6 +264,57 @@ def create_server(
         cards = [to_card(record, at, fsrs) for record in records]
         ranked = sorted(cards, key=lambda c: (c.retrievability is not None, c.retrievability))
         return ranked[:limit]
+
+    @server.tool(annotations=_WRITE_LOCAL)
+    async def record_problem(
+        url: AnyHttpUrl,
+        title: NonBlank,
+        tags: list[NonBlank] | None = None,
+        level: NonBlank | None = None,
+    ) -> Problem:
+        """Record a problem from a platform this server has no adapter for, as read from
+        its page: its URL, title, the tags the page shows and its difficulty as the page
+        states it. The platform is the URL's host, and the problem id its path. Returns
+        the platform and problem_id to pass to log_review."""
+
+        parts = urlsplit(str(url))
+        host = (parts.hostname or "").removeprefix("www.")
+        adapter = adapter_for_host(host)
+        if adapter is not None:
+            raise ToolError(
+                f"{host} has an adapter: call log_review with platform '{adapter.name}' and "
+                "its problem id, so the problem is read from the platform itself."
+            )
+        problem_id = parts.path.strip("/") + (f"?{parts.query}" if parts.query else "")
+        if not problem_id:
+            raise ToolError(f"{url} has no path to identify a problem by")
+        problem = Problem(
+            platform=host,
+            problem_id=problem_id,
+            title=title,
+            url=str(url),
+            tags=list(dict.fromkeys(tags or [])),
+            level=level,
+            source="reported",
+        )
+        return await asyncio.to_thread(store.save_problem, problem)
+
+    @server.tool(annotations=_READ_LOCAL)
+    async def progress() -> list[PlatformProgress]:
+        """Per platform the user has reviewed on: problems reviewed, reviews logged, and
+        problems due for revision now."""
+
+        rows = await asyncio.to_thread(store.progress, now())
+        return [
+            PlatformProgress(
+                platform=platform,
+                source="platform" if platform in adapters else "reported",
+                problems=problems,
+                reviews=reviews,
+                due_now=due_now,
+            )
+            for platform, problems, reviews, due_now in rows
+        ]
 
     @server.tool(annotations=_READ_LOCAL)
     async def schedule_info() -> ScheduleInfo:
