@@ -74,12 +74,17 @@ class ChatCompletionsConversation:
             raise BackendError(f"{b._url} answered without a chat completions message") from exc
         if not isinstance(message, dict):
             raise BackendError(f"{b._url} answered with a malformed message")
+        content, refusal = message.get("content"), message.get("refusal")
+        # The format allows only a string or null for both.
+        for field, value in (("content", content), ("refusal", refusal)):
+            if value is not None and not isinstance(value, str):
+                raise BackendError(f"{b._url} answered with a malformed {field}: {value!r}")
         raw_calls = message.get("tool_calls") or []
         requests = [_to_request(call) for call in raw_calls]
 
         # Echo back only the standard fields: servers add their own (reasoning,
         # annotations) that other servers reject in a request.
-        echoed: dict[str, Any] = {"role": "assistant", "content": message.get("content") or ""}
+        echoed: dict[str, Any] = {"role": "assistant", "content": content or ""}
         if raw_calls:
             echoed["tool_calls"] = raw_calls
         self._messages.append(echoed)
@@ -90,9 +95,8 @@ class ChatCompletionsConversation:
         if not isinstance(usage, dict):
             raise BackendError(f"{b._url} answered with malformed usage: {usage!r}")
         return Turn(
-            text=message.get("content") or "",
-            # The format's own refusal field, set when the model declines the request.
-            refused=bool(message.get("refusal")),
+            text=content or "",
+            refused=bool(refusal),
             tool_requests=requests,
             usage=Usage(
                 input=_token_count(usage, "prompt_tokens"),

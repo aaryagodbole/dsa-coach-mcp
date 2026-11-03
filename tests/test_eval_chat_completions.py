@@ -130,6 +130,8 @@ def test_a_key_is_never_sent_over_plain_http_to_another_machine() -> None:
         {**reply({"role": "assistant", "content": "Hi"}), "usage": {"prompt_tokens": "9"}},
         {**reply({"role": "assistant", "content": "Hi"}), "usage": {"prompt_tokens": False}},
         {**reply({"role": "assistant", "content": "Hi"}), "usage": []},
+        reply({"role": "assistant", "content": "Hi", "refusal": 1}),
+        reply({"role": "assistant", "content": ["Hi"]}),
     ],
 )
 async def test_a_malformed_response_is_a_backend_error(body: dict[str, Any]) -> None:
