@@ -53,8 +53,13 @@ server) and call record_problem with its URL, title and tags before log_review."
 DASHBOARD_URI = "ui://dsa-coach/dashboard"
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 
-_READ_REMOTE = ToolAnnotations(read_only_hint=True, open_world_hint=True)
-_READ_LOCAL = ToolAnnotations(read_only_hint=True, open_world_hint=False)
+# Every hint is explicit: unset, destructiveHint defaults to true.
+_READ_REMOTE = ToolAnnotations(
+    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
+)
+_READ_LOCAL = ToolAnnotations(
+    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
+)
 _WRITE_LOCAL = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
 )
