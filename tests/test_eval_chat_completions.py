@@ -6,8 +6,9 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 
-from evals.backends import ChatCompletionsBackend, ToolOutcome, ToolSpec
+from evals.backends import BackendError, ChatCompletionsBackend, ToolOutcome, ToolSpec
 
 TOOLS = [ToolSpec("revisions_due", "What to revise.", {"type": "object", "properties": {}})]
 
@@ -105,3 +106,40 @@ async def test_arguments_as_objects_bad_json_or_non_objects() -> None:
         ({}, False),
         ({}, False),
     ]
+
+
+def test_a_key_is_never_sent_over_plain_http_to_another_machine() -> None:
+    http = server([], [])
+
+    with pytest.raises(BackendError):
+        ChatCompletionsBackend(http, "http://models.example/v1", "m", "secret")
+    for url in ("https://models.example/v1", "http://localhost:1/v1", "http://127.0.0.1:1/v1"):
+        ChatCompletionsBackend(http, url, "m", "secret")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"choices": []},
+        {"choices": [{}]},
+        {"choices": [{"message": "text"}]},
+        reply({"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "t"}}]}),
+        reply({"role": "assistant", "content": "", "tool_calls": [{"id": "a", "function": {}}]}),
+    ],
+)
+async def test_a_malformed_response_is_a_backend_error(body: dict[str, Any]) -> None:
+    backend = ChatCompletionsBackend(server([body], []), "http://localhost:1/v1", "m")
+
+    with pytest.raises(BackendError):
+        await backend.start("s", "p", TOOLS).next_turn()
+
+
+async def test_null_token_counts_count_as_zero() -> None:
+    body = reply({"role": "assistant", "content": "Hi"}, None)
+    body["usage"] = {"prompt_tokens": None, "completion_tokens": None}
+    backend = ChatCompletionsBackend(server([body], []), "http://localhost:1/v1", "m")
+
+    turn = await backend.start("s", "p", TOOLS).next_turn()
+
+    assert (turn.usage.input, turn.usage.output) == (0, 0)

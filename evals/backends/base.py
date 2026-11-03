@@ -16,6 +16,10 @@ class ToolSpec:
     input_schema: dict[str, Any]
 
 
+class BackendError(Exception):
+    """The backend was misconfigured, or the model API answered outside its format."""
+
+
 @dataclass(frozen=True)
 class ToolRequest:
     id: str

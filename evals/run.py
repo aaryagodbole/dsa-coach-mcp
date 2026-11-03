@@ -22,7 +22,7 @@ from typing import Any
 import httpx
 
 from evals.agent import run_task
-from evals.backends import ChatCompletionsBackend, Usage
+from evals.backends import BackendError, ChatCompletionsBackend, Usage
 from evals.graders import Grade, Summary, grade, summarise
 
 TASKS = Path(__file__).with_name("tasks.json")
@@ -59,13 +59,17 @@ async def main_async(args: argparse.Namespace) -> int:
     records: list[dict[str, Any]] = []
     # A model served on this machine can take minutes on a long turn.
     async with httpx.AsyncClient(timeout=httpx.Timeout(600.0)) as http:
-        backend = ChatCompletionsBackend(
-            http, args.base_url, args.model, os.environ.get(args.api_key_env)
-        )
+        try:
+            backend = ChatCompletionsBackend(
+                http, args.base_url, args.model, os.environ.get(args.api_key_env)
+            )
+        except BackendError as exc:
+            print(exc, file=sys.stderr)
+            return 2
         for task in tasks:
             try:
                 calls, usage, final = await run_task(backend, task)
-            except httpx.HTTPError as exc:
+            except (httpx.HTTPError, BackendError) as exc:
                 print(f"{args.base_url}: {exc}", file=sys.stderr)
                 return 2
             result = grade(task, calls)
