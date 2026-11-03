@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from evals.agent import run_task
+from evals.agent import MAX_TURNS, run_task
 from evals.backends import ToolOutcome, ToolRequest, ToolSpec, Turn, Usage
 
 
@@ -82,3 +82,28 @@ async def test_a_refusal_ends_the_task() -> None:
     calls, _, final = await run_task(backend, {"id": "x", "prompt": "p"})
 
     assert (calls, final) == ([], "[refused]")
+
+
+async def test_every_request_of_a_turn_goes_back_together_in_order() -> None:
+    backend = ScriptedBackend(
+        [
+            turn(ToolRequest("a", "mistake_kinds", {}), ToolRequest("b", "revisions_due", {})),
+            turn(text="done"),
+        ]
+    )
+
+    await run_task(backend, {"id": "x", "prompt": "p", "seed": "history"})
+
+    assert len(backend.results) == 1
+    assert [o.request.id for o in backend.results[0]] == ["a", "b"]
+
+
+async def test_a_model_that_never_stops_is_cut_off_at_the_turn_limit() -> None:
+    backend = ScriptedBackend(
+        [turn(ToolRequest(str(i), "revisions_due", {})) for i in range(MAX_TURNS + 5)]
+    )
+
+    calls, _, final = await run_task(backend, {"id": "x", "prompt": "p"})
+
+    assert len(calls) == MAX_TURNS
+    assert final == "[turn limit reached]"
