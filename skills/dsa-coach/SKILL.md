@@ -20,8 +20,8 @@ or platform the tools did not give you.
    (`progress`, `mistake_patterns`) and tell the user it cannot be searched.
 3. Combine what you read with `mistake_patterns`: the topics they solve least and the
    mistakes they repeat are where practice pays off.
-4. For each `platform`-sourced platform, call `search_problems` with tags and levels
-   taken from steps 1-3, and `exclude_solved_by` set to their handle. If nothing
+4. For the same platforms as step 2, call `search_problems` with tags and levels taken
+   from steps 1-3, and `exclude_solved_by` set to their handle there. If nothing
    matches, widen one filter at a time and say so.
 5. For each problem, say which weakness or past mistake it targets.
 
