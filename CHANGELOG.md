@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Read-only tools declare every behavior hint explicitly (`destructiveHint: false`,
+  `idempotentHint: true`), since an unset `destructiveHint` defaults to true.
+
 ## [0.2.0] - 2026-11-03
 
 ### Added

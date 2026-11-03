@@ -116,6 +116,16 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
     }
 
 
+async def test_every_tool_declares_all_four_behavior_hints(server: MCPServer) -> None:
+    # An unset destructiveHint defaults to true in the spec, so a client or directory
+    # reading hints alone would treat a read-only tool as destructive.
+    for tool in await server.list_tools():
+        hints = tool.annotations
+        assert hints is not None, tool.name
+        for hint in ("read_only_hint", "destructive_hint", "idempotent_hint", "open_world_hint"):
+            assert isinstance(getattr(hints, hint), bool), (tool.name, hint)
+
+
 async def test_prompts_only_name_tools_and_arguments_that_exist(server: MCPServer) -> None:
     tools = await server.list_tools()
     known = {t.name for t in tools} | {arg for t in tools for arg in t.input_schema["properties"]}
