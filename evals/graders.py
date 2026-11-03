@@ -7,7 +7,7 @@ within budget."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,26 +36,31 @@ class Grade:
     notes: list[str] = field(default_factory=list)
 
 
+PREDICATES: dict[str, Callable[[Any, Any], bool]] = {
+    "equals": lambda value, expected: bool(value == expected),
+    "in": lambda value, expected: value in expected,
+    "contains": lambda value, expected: (
+        isinstance(value, str) and expected.lower() in value.lower()
+    ),
+    "min_items": lambda value, expected: isinstance(value, list) and len(value) >= expected,
+    "has_kind": lambda value, expected: (
+        isinstance(value, list)
+        and any(
+            isinstance(item, Mapping)
+            and str(item.get("kind", "")).strip().lower() == expected.lower()
+            for item in value
+        )
+    ),
+}
+
+
 def check(predicate: Mapping[str, Any], value: Any) -> bool:
     """One argument predicate. Unknown predicate names fail, so a typo in tasks.json
     cannot quietly pass."""
 
     ((kind, expected),) = predicate.items()
-    if kind == "equals":
-        return bool(value == expected)
-    if kind == "in":
-        return value in expected
-    if kind == "contains":
-        return isinstance(value, str) and expected.lower() in value.lower()
-    if kind == "min_items":
-        return isinstance(value, list) and len(value) >= expected
-    if kind == "has_kind":
-        return isinstance(value, list) and any(
-            isinstance(item, Mapping)
-            and str(item.get("kind", "")).strip().lower() == expected.lower()
-            for item in value
-        )
-    return False
+    test = PREDICATES.get(kind)
+    return test is not None and test(value, expected)
 
 
 def _argument_score(args: Mapping[str, Mapping[str, Any]], call: ToolCall) -> tuple[int, list[str]]:

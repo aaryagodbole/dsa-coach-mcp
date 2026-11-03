@@ -16,9 +16,15 @@ on:
 permissions:
   contents: read
 
+# Queue a second dispatch behind the first rather than paying for two at once.
+concurrency:
+  group: agent-evals
+  cancel-in-progress: false
+
 jobs:
   evals:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

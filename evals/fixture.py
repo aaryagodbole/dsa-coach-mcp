@@ -117,3 +117,7 @@ async def seed_history(server: MCPServer, clock: Clock) -> None:
         )
         clock.at += timedelta(days=3)
     clock.at += timedelta(days=14)
+
+
+# The worlds a task can ask for by name in tasks.json's "seed".
+SEEDS = {"history": seed_history}

@@ -26,8 +26,8 @@ from anthropic.types.beta import (
 )
 from mcp import Client
 
-from evals.fixture import build_server, seed_history
-from evals.graders import Grade, ToolCall, grade, summarise
+from evals.fixture import SEEDS, build_server
+from evals.graders import Grade, Summary, ToolCall, grade, summarise
 
 TASKS = Path(__file__).with_name("tasks.json")
 MAX_TURNS = 12
@@ -50,8 +50,8 @@ async def run_task(
 ) -> tuple[list[ToolCall], dict[str, int], str]:
     with tempfile.TemporaryDirectory() as tmp:
         server, clock = build_server(Path(tmp) / "coach.db")
-        if task.get("seed") == "history":
-            await seed_history(server, clock)
+        if "seed" in task:
+            await SEEDS[task["seed"]](server, clock)
         async with Client(server) as mcp:
             tools = to_claude_tools((await mcp.list_tools()).tools)
             system: list[BetaTextBlockParam] = [{"type": "text", "text": mcp.instructions or ""}]
@@ -100,6 +100,27 @@ async def run_task(
             return calls, usage, final
 
 
+def write_results(
+    args: argparse.Namespace,
+    summary: Summary,
+    totals: dict[str, int],
+    records: list[dict[str, Any]],
+) -> None:
+    if args.out:
+        args.out.write_text(
+            json.dumps(
+                {
+                    "model": args.model,
+                    "effort": args.effort,
+                    "summary": asdict(summary),
+                    "tokens": totals,
+                    "tasks": records,
+                },
+                indent=2,
+            )
+        )
+
+
 async def main_async(args: argparse.Namespace) -> int:
     tasks = json.loads(TASKS.read_text())["tasks"]
     if args.only:
@@ -107,7 +128,7 @@ async def main_async(args: argparse.Namespace) -> int:
     claude = anthropic.AsyncAnthropic()
     grades: list[Grade] = []
     totals = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
-    records = []
+    records: list[dict[str, Any]] = []
     for task in tasks:
         calls, usage, final = await run_task(claude, task, args.model, cast(Effort, args.effort))
         result = grade(task, calls)
@@ -124,6 +145,8 @@ async def main_async(args: argparse.Namespace) -> int:
                 "usage": usage,
             }
         )
+        # Written after every task, so a run that dies midway keeps what it paid for.
+        write_results(args, summarise(grades), totals, records)
 
     summary = summarise(grades)
     print(
@@ -132,19 +155,6 @@ async def main_async(args: argparse.Namespace) -> int:
         f"tool error rate {summary.error_rate:.0%} · {summary.mean_calls:.1f} calls/task"
     )
     print(f"tokens: {totals}")
-    if args.out:
-        args.out.write_text(
-            json.dumps(
-                {
-                    "model": args.model,
-                    "effort": args.effort,
-                    "summary": asdict(summary),
-                    "tokens": totals,
-                    "tasks": records,
-                },
-                indent=2,
-            )
-        )
     return 0 if summary.passed == summary.tasks else 1
 
 

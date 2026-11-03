@@ -5,7 +5,8 @@ from pathlib import Path
 
 from mcp import Client
 
-from evals.fixture import build_server, seed_history
+from evals.fixture import SEEDS, build_server, seed_history
+from evals.graders import PREDICATES
 
 TASKS = json.loads((Path(__file__).parents[1] / "evals" / "tasks.json").read_text())["tasks"]
 
@@ -18,10 +19,14 @@ async def test_every_task_names_only_real_tools_and_arguments(tmp_path: Path) ->
         }
 
     for task in TASKS:
+        assert task.get("seed") in {None, *SEEDS}, task["id"]
         for expectation in task.get("expect", []):
             for name in [expectation["tool"], *expectation.get("alternatives", [])]:
                 assert name in tools, (task["id"], name)
             assert set(expectation.get("args", {})) <= tools[expectation["tool"]], task["id"]
+            for predicate in expectation.get("args", {}).values():
+                assert len(predicate) == 1, task["id"]
+                assert set(predicate) <= set(PREDICATES), task["id"]
         assert set(task.get("forbid", [])) - {"*"} <= set(tools), task["id"]
 
 
