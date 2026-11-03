@@ -4,6 +4,7 @@ import sqlite3
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from fsrs import Card, Rating
 
 from dsa_coach_mcp.models import Mistake, Problem
@@ -87,7 +88,9 @@ def test_an_sm2_database_moves_to_fsrs_keeping_cards_and_mistakes(tmp_path: Path
     assert [m.note for m in store.mistakes(limit=10)] == ["loop bound"]
 
 
-def test_a_first_version_database_upgrades_all_the_way(tmp_path: Path) -> None:
+# 0: databases written before the schema was versioned; 1: after its first migration.
+@pytest.mark.parametrize("user_version", [0, 1])
+def test_a_first_version_database_upgrades_all_the_way(tmp_path: Path, user_version: int) -> None:
     path = tmp_path / "coach.db"
     with sqlite3.connect(path) as conn:
         conn.executescript(
@@ -95,11 +98,17 @@ def test_a_first_version_database_upgrades_all_the_way(tmp_path: Path) -> None:
             "title TEXT NOT NULL, url TEXT NOT NULL, ease REAL NOT NULL, "
             "interval_days INTEGER NOT NULL, repetitions INTEGER NOT NULL, "
             "due TEXT NOT NULL, PRIMARY KEY (platform, problem_id));"
-            "INSERT INTO review_cards VALUES ('leetcode', 'two-sum', 'two-sum', "
+            "INSERT INTO review_cards VALUES ('leetcode', 'two-sum', 'Two Sum', "
             "'https://example.com/two-sum', 2.5, 1, 1, '2026-01-02');"
+            f"PRAGMA user_version = {user_version};"
         )
 
     store = ReviewStore(path)
+    # Checked before any review: record_review would recreate a card the migration lost.
+    migrated = store.get("leetcode", "two-sum")
+    assert migrated is not None
+    assert (migrated.title, migrated.card.due) == ("Two Sum", datetime(2026, 1, 2, tzinfo=UTC))
+
     store.record_review(
         problem("two-sum", ["array"]),
         due_in(3),
