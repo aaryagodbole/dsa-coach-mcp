@@ -1,0 +1,87 @@
+{
+  "tasks": [
+    {
+      "id": "plan-from-profile",
+      "prompt": "I'm 'learner' on the practice platform. What should I practise next? Find me a couple of problems.",
+      "expect": [
+        {"tool": "get_profile", "args": {"platform": {"equals": "practice"}, "handle": {"equals": "learner"}}},
+        {"tool": "search_problems", "args": {"platform": {"equals": "practice"}, "tags": {"min_items": 1}}}
+      ],
+      "forbid": ["log_review", "record_problem"],
+      "max_calls": 6
+    },
+    {
+      "id": "plan-avoids-solved",
+      "prompt": "Give me three practice-platform problems I haven't solved yet. My handle there is learner.",
+      "expect": [
+        {"tool": "search_problems", "args": {"platform": {"equals": "practice"}, "exclude_solved_by": {"equals": "learner"}}}
+      ],
+      "forbid": ["log_review"],
+      "max_calls": 5
+    },
+    {
+      "id": "log-hard-review-with-mistake",
+      "prompt": "I just redid pair-diff on practice. Got it, but it took ages and I forgot to skip duplicate pairs.",
+      "expect": [
+        {"tool": "log_review", "args": {"platform": {"equals": "practice"}, "problem_id": {"equals": "pair-diff"}, "rating": {"in": ["hard"]}, "mistakes": {"min_items": 1}}}
+      ],
+      "forbid": ["record_problem"],
+      "max_calls": 4
+    },
+    {
+      "id": "reuse-existing-mistake-label",
+      "prompt": "Redid course-order on practice and couldn't finish it: I forgot cycle detection yet again.",
+      "seed": "history",
+      "expect": [
+        {"tool": "log_review", "args": {"problem_id": {"equals": "course-order"}, "rating": {"in": ["again"]}, "mistakes": {"has_kind": "missed cycle detection"}}}
+      ],
+      "max_calls": 5
+    },
+    {
+      "id": "revise-today",
+      "prompt": "What should I revise today?",
+      "seed": "history",
+      "expect": [
+        {"tool": "revisions_due", "args": {}}
+      ],
+      "forbid": ["log_review", "record_problem", "personalize_schedule"],
+      "max_calls": 4
+    },
+    {
+      "id": "mistake-patterns",
+      "prompt": "What mistakes do I keep making?",
+      "seed": "history",
+      "expect": [
+        {"tool": "mistake_patterns", "args": {}, "alternatives": ["list_mistakes", "mistake_kinds"]}
+      ],
+      "forbid": ["log_review"],
+      "max_calls": 4
+    },
+    {
+      "id": "record-any-platform",
+      "prompt": "I solved this one easily: https://www.hackerrank.com/challenges/ctci-ransom-note/problem (\"Hash Tables: Ransom Note\", tagged Hash Tables, difficulty Easy). Please log it.",
+      "expect": [
+        {"tool": "record_problem", "args": {"url": {"contains": "hackerrank.com/challenges/ctci-ransom-note"}, "title": {"contains": "Ransom Note"}}},
+        {"tool": "log_review", "args": {"platform": {"equals": "hackerrank.com"}, "rating": {"in": ["easy"]}}}
+      ],
+      "max_calls": 5
+    },
+    {
+      "id": "dashboard",
+      "prompt": "Show me my progress dashboard.",
+      "seed": "history",
+      "expect": [
+        {"tool": "show_dashboard", "args": {}}
+      ],
+      "forbid": ["log_review"],
+      "max_calls": 3
+    },
+    {
+      "id": "no-tools-for-chitchat",
+      "prompt": "What does the acronym DSA stand for? One line, please.",
+      "expect": [],
+      "forbid": ["*"],
+      "max_calls": 0
+    }
+  ]
+}

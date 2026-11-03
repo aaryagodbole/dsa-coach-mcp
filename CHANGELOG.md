@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format follows
 
 - Listed in the official MCP Registry as `io.github.aaryagodbole/dsa-coach-mcp`: the
   release workflow publishes `server.json` after PyPI, authenticated with GitHub OIDC.
+- Agent evals (`evals/`): Claude drives the server over MCP against a deterministic
+  fixture world, graded without an LLM judge on tool selection, arguments, forbidden
+  tools, errors and call budget. Runs locally or from a manually triggered workflow.
+
 - `show_dashboard`, an MCP App (`ui://dsa-coach/dashboard`, `text/html;profile=mcp-app`):
   progress per platform, revisions due ordered by FSRS's recall estimate, and a heatmap
   of mistakes by label and tag, rendered in the conversation by hosts that support MCP

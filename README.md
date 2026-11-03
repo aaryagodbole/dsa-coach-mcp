@@ -190,6 +190,29 @@ handles you give it, and revision cards stay in a local SQLite file.
 
 The server and tools need no changes.
 
+## Evals
+
+Unit tests check the code; [`evals/`](evals/) checks whether a model can actually
+coach with these tools. Claude drives the real server over the MCP protocol, against a
+fixture world (one practice platform, a seeded history, a fixed clock), on tasks such
+as planning from a profile, logging a review with its mistakes, reusing an existing
+mistake label, recording a problem from another platform, and staying silent when no
+tool is needed.
+
+Grading is deterministic, with no LLM judge: each task lists the tool calls it expects
+with predicates on their arguments, the tools it must not touch, and a call budget. A run
+reports pass rate, tool-selection accuracy, argument accuracy, tool error rate, calls
+per task and token usage.
+
+```bash
+uv run --all-groups python -m evals.run --model claude-opus-5-5 --effort medium
+```
+
+It calls the Claude API, so it costs money and never runs on its own: run it locally,
+or start the **Agent evals** workflow from the Actions tab (it needs an
+`ANTHROPIC_API_KEY` repository secret). The graders, the fixture and the agent loop
+are unit-tested in CI without the API.
+
 ## Development
 
 ```bash
