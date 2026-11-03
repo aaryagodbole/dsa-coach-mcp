@@ -85,7 +85,14 @@
     const a = el("a", { href: safe ? url : "#", title: text }, text);
     a.addEventListener("click", (event) => {
       event.preventDefault();
-      if (safe) request("ui/open-link", { url }).catch(() => {});
+      if (!safe) return;
+      const failed = () => {
+        // Leave the address visible so the user can still open it themselves.
+        a.textContent = `${text} · couldn't open, ${url}`;
+      };
+      request("ui/open-link", { url })
+        .then((result) => { if (result && result.isError) failed(); })
+        .catch(failed);
     });
     return a;
   };
