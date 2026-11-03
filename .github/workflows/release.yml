@@ -75,6 +75,7 @@ jobs:
   mcp-registry:
     needs: pypi
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # Upgrade deliberately; never the mutable releases/latest.
       MCP_PUBLISHER_VERSION: v1.8.1
@@ -91,8 +92,8 @@ jobs:
         run: |
           archive="mcp-publisher_linux_amd64.tar.gz"
           base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
-          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
-          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          curl --fail --location --silent --show-error --max-time 120 --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --max-time 120 --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
           cosign verify-blob \
             --bundle "$archive.sigstore.json" \
             --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
@@ -111,7 +112,7 @@ jobs:
           name=$(jq -r .name server.json)
           version=$(jq -r .version server.json)
           url="https://registry.modelcontextprotocol.io/v0/servers/$(jq -rn --arg n "$name" '$n|@uri')/versions/$version"
-          status=$(curl --silent --show-error --output listed.json --write-out '%{http_code}' "$url")
+          status=$(curl --silent --show-error --max-time 60 --output listed.json --write-out '%{http_code}' "$url")
           if [ "$status" = 404 ]; then
             echo "listed=false" >> "$GITHUB_OUTPUT"
           elif [ "$status" = 200 ]; then
