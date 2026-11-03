@@ -14,15 +14,15 @@ or platform the tools did not give you.
 ## Planning practice
 
 1. Call `list_platforms` once to learn each platform's tags and levels.
-2. Call `get_profile` for every platform the user named, with their handle. A platform
-   whose `source` is `reported` has no adapter, so `get_profile` and `search_problems`
-   cannot read it: plan from its recorded reviews (`progress`, `mistake_patterns`)
-   and tell the user it cannot be searched.
+2. Call `get_profile`, with their handle, for every platform the user named whose
+   `source` is `platform`. A `reported` platform has no adapter, so neither
+   `get_profile` nor `search_problems` can read it: plan from its recorded reviews
+   (`progress`, `mistake_patterns`) and tell the user it cannot be searched.
 3. Combine what you read with `mistake_patterns`: the topics they solve least and the
    mistakes they repeat are where practice pays off.
-4. Call `search_problems` with tags and levels taken from steps 1-3, and
-   `exclude_solved_by` set to their handle. If nothing matches, widen one filter at a
-   time and say so.
+4. For each `platform`-sourced platform, call `search_problems` with tags and levels
+   taken from steps 1-3, and `exclude_solved_by` set to their handle. If nothing
+   matches, widen one filter at a time and say so.
 5. For each problem, say which weakness or past mistake it targets.
 
 ## After the user solves or retries a problem
@@ -48,9 +48,10 @@ Platforms `list_platforms` shows with `source` `platform` are read from their AP
 first time the user reviews a problem from any other platform, read the problem page,
 with a browser MCP server if one is connected, then call `record_problem` with its URL,
 title, the tags the page shows and its stated difficulty, and use the `platform` and
-`problem_id` it returns for `log_review`. Later reviews of that problem reuse the same
-`platform` and `problem_id` without recording it again. Never record a problem from
-memory or a guessed URL.
+`problem_id` it returns for `log_review`. Record it only that once: later reviews pass
+the same `platform` and `problem_id` to `log_review`, which reads the recorded problem.
+Both come from the URL as `record_problem` describes, so the page need not be read
+again. Never record a problem from memory or a guessed URL.
 
 ## Revision
 
