@@ -14,7 +14,6 @@ All notable changes to this project are documented here. The format follows
   read from its page (for example through Playwright MCP's browser extension). The
   platform is the URL's host; such problems are marked `reported`, and `list_platforms`
   lists them. `progress` reports problems, reviews and due revisions per platform.
-
 - `schedule_info` and `personalize_schedule`: inspect the FSRS parameters, and fit them
   to the user's own review history with the `optimizer` extra. A fit that leaves FSRS's
   defaults unchanged (too little history) is reported and not saved.
