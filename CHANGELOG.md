@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format follows
 
 - Listed in the official MCP Registry as `io.github.aaryagodbole/dsa-coach-mcp`: the
   release workflow publishes `server.json` after PyPI, authenticated with GitHub OIDC.
+- An agent skill (`skills/dsa-coach/SKILL.md`) that tells the agent when and how to use
+  the tools; a test keeps it naming only tools, arguments and prompts that exist.
+
 - Agent evals (`evals/`): Claude drives the server over MCP against a deterministic
   fixture world, graded without an LLM judge on tool selection, arguments, forbidden
   tools, errors and call budget. Runs locally or from a manually triggered workflow.

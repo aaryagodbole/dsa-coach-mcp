@@ -165,6 +165,19 @@ claude mcp add dsa-coach -- uvx dsa-coach-mcp
 
 **Cursor**: same `command` and `args` as above in `.cursor/mcp.json`.
 
+### Agent skill
+
+[`skills/dsa-coach/SKILL.md`](skills/dsa-coach/SKILL.md) tells the agent when to reach
+for these tools and how to use them well: how to rate a review, to reuse existing
+mistake labels, and to record problems from other platforms only from a page it read.
+For Claude Code, copy it into your skills:
+
+```bash
+mkdir -p ~/.claude/skills/dsa-coach
+curl -fsSL https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/skills/dsa-coach/SKILL.md \
+  -o ~/.claude/skills/dsa-coach/SKILL.md
+```
+
 ### Configuration
 
 | Variable | Default | Purpose |
