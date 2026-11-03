@@ -85,11 +85,14 @@ class ChatCompletionsConversation:
         self._messages.append(echoed)
 
         usage = body.get("usage") or {}
+        if not isinstance(usage, dict):
+            raise BackendError(f"{b._url} answered with malformed usage: {usage!r}")
         return Turn(
             text=message.get("content") or "",
             tool_requests=requests,
             usage=Usage(
-                input=usage.get("prompt_tokens") or 0, output=usage.get("completion_tokens") or 0
+                input=_token_count(usage, "prompt_tokens"),
+                output=_token_count(usage, "completion_tokens"),
             ),
         )
 
@@ -97,6 +100,14 @@ class ChatCompletionsConversation:
         self._messages.extend(
             {"role": "tool", "tool_call_id": o.request.id, "content": o.text} for o in outcomes
         )
+
+
+def _token_count(usage: dict[str, Any], key: str) -> int:
+    count = usage.get(key) or 0
+    # bool is an int subclass, but never a token count.
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+        raise BackendError(f"malformed {key}: {count!r}")
+    return count
 
 
 def _safe_for_key(base_url: str) -> bool:

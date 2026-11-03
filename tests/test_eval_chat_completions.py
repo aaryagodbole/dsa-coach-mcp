@@ -126,6 +126,8 @@ def test_a_key_is_never_sent_over_plain_http_to_another_machine() -> None:
         {"choices": [{"message": "text"}]},
         reply({"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "t"}}]}),
         reply({"role": "assistant", "content": "", "tool_calls": [{"id": "a", "function": {}}]}),
+        {**reply({"role": "assistant", "content": "Hi"}), "usage": "lots"},
+        {**reply({"role": "assistant", "content": "Hi"}), "usage": {"prompt_tokens": "9"}},
     ],
 )
 async def test_a_malformed_response_is_a_backend_error(body: dict[str, Any]) -> None:
