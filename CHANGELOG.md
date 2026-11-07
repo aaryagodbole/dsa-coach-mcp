@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The dashboard is a React + TypeScript app built with Vite, talking to the host
+  through the official MCP Apps SDK instead of hand-written postMessage code.
 - Read-only tools declare every behavior hint explicitly (`destructiveHint: false`,
   `idempotentHint: true`), since an unset `destructiveHint` defaults to true.
 

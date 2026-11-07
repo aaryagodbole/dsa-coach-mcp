@@ -31,3 +31,24 @@ jobs:
         run: uv run mypy
       - name: Test
         run: uv run pytest --cov --cov-report=term-missing
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - name: Type check and build
+        run: npm run build
+      # The package ships the built file, so it must match the source.
+      - name: Built dashboard is committed
+        run: git diff --exit-code -- ../src/dsa_coach_mcp/ui/dashboard.html
