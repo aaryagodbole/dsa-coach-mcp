@@ -115,6 +115,7 @@ class CodeforcesAdapter:
             unsolved_attempts_by_tag=dict(unsolved_by_tag),
             solved_ids=sorted(solved),
             submissions=submissions,
+            rejections_public=True,
         )
 
     async def search(self, tags: list[str], level: str | None, limit: int) -> list[Problem]:

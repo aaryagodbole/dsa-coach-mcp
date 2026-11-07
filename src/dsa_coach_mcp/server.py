@@ -17,7 +17,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field
 
-from . import scheduling
+from . import evidence, scheduling
 from .insights import insights as build_insights
 from .models import (
     Dashboard,
@@ -31,6 +31,7 @@ from .models import (
     Problem,
     Profile,
     ReviewCard,
+    ReviewEvidence,
     ScheduleInfo,
 )
 from .platforms import PlatformAdapter, PlatformError
@@ -42,7 +43,9 @@ Coach DSA practice from the user's own history on competitive-programming platfo
 Call list_platforms first to learn each platform's tags and levels, get_profile to see
 where the user stands, and search_problems with filters you chose from that data.
 After the user solves or revisits a problem, record how well they recalled it with
-log_review (again, hard, good or easy), together with every mistake they made: label
+log_review (again, hard, good or easy). On a platform with an adapter, call
+review_evidence with their handle first: it reads the rating from their submissions,
+which is more reliable than their own estimate. Log every mistake they made too: label
 each mistake with a short kind, reusing a label from mistake_kinds whenever one fits.
 revisions_due lists what to revise now, least likely to be remembered first;
 mistake_patterns and list_mistakes show where the user keeps going wrong.
@@ -184,6 +187,29 @@ def create_server(
             profile = await adapter_for(platform).profile(handle)
         recent = sorted(profile.submissions, key=lambda s: s.submitted_at, reverse=True)
         return profile.model_copy(update={"submissions": recent[:recent_submissions]})
+
+    @server.tool(annotations=_READ_REMOTE)
+    async def review_evidence(platform: str, problem_id: NonBlank, handle: str) -> ReviewEvidence:
+        """Suggest a log_review rating from the user's submissions to this problem since
+        it was last reviewed: again if none was accepted, good if the first was, hard if
+        rejected ones came first. Never easy, since speed is not in the history. Where the
+        platform hides rejected submissions, or nothing was submitted, it suggests
+        nothing and says why; ask the user then. Tell the user the suggestion and its
+        reason, and let them overrule it."""
+
+        adapter = adapter_for(platform)
+        async with _platform_errors(platform):
+            # Resolved first, so the id matches the card log_review keeps for it.
+            problem = await adapter.problem(problem_id)
+            profile = await adapter.profile(handle)
+        record = await asyncio.to_thread(store.get, platform, problem.problem_id)
+        return evidence.review_evidence(
+            platform,
+            problem.problem_id,
+            profile.submissions,
+            record.card.last_review if record else None,
+            profile.rejections_public,
+        )
 
     @server.tool(annotations=_READ_REMOTE)
     async def search_problems(

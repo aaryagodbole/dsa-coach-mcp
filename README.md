@@ -72,12 +72,13 @@ flowchart LR
 | `get_profile` | Your level, solved and unsolved counts per tag, and recent submissions |
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
 | `log_review` | Records how you did (`again` / `hard` / `good` / `easy`), journals the mistakes behind it, and schedules the next revision with FSRS. Title, link and tags come from the platform |
+| `review_evidence` | Suggests a `log_review` rating from your actual submissions since the last review: `again` if none was accepted, `good` on a first-try accept, `hard` after rejected tries. Never `easy`, and nothing where a platform hides rejected submissions |
 | `revisions_due` | Problems due now, the one you are least likely to remember first, each with FSRS's recall estimate |
 | `schedule_info` | The FSRS parameters in use, whether they are personalised, and how many reviews are logged |
 | `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
 | `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |
 | `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
-| `show_dashboard` | Progress, revisions due by risk of forgetting, and a mistake heatmap, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
+| `show_dashboard` | Progress, revisions due by risk of forgetting, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
 | `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |

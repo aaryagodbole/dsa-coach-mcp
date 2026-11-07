@@ -37,6 +37,8 @@ class Profile(BaseModel):
     unsolved_attempts_by_tag: dict[str, int] = Field(default_factory=dict)
     solved_ids: list[str] = Field(default_factory=list)
     submissions: list[Submission] = Field(default_factory=list)
+    # Whether rejected submissions are listed too, or only accepted ones.
+    rejections_public: bool = False
     # What this platform's data cannot tell you, so the reader does not over-trust it.
     limitations: list[str] = Field(default_factory=list)
 
@@ -116,6 +118,22 @@ class MistakePatterns(BaseModel):
     by_tag: list[MistakeCount]
     by_platform: list[MistakeCount]
     by_month: list[MistakeCount]
+
+
+class ReviewEvidence(BaseModel):
+    platform: str
+    problem_id: str
+    # Submissions to this problem since the card was last reviewed (all, if never).
+    since: datetime | None
+    submissions: int
+    accepted: bool
+    # Rejected submissions before the first accepted one; None where the platform does not
+    # list rejections.
+    rejected_before_accepted: int | None
+    first_submitted_at: datetime | None
+    accepted_at: datetime | None
+    suggested_rating: str | None
+    reason: str
 
 
 class TopicForecast(BaseModel):

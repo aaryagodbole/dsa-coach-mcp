@@ -27,6 +27,11 @@ or platform the tools did not give you.
 
 ## After the user solves or retries a problem
 
+On a platform with an adapter, first call `review_evidence` with the user's handle: it
+reads the rating from their submissions since the last review, which is more reliable
+than their own estimate. Tell them the suggestion and its reason; they may overrule it.
+If it suggests nothing, ask them.
+
 Call `log_review` with the platform, the problem id and how it went:
 
 - `again`: could not solve it
