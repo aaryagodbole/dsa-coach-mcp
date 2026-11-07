@@ -118,7 +118,51 @@ class MistakePatterns(BaseModel):
     by_month: list[MistakeCount]
 
 
+class TopicForecast(BaseModel):
+    tag: str
+    problems: int
+    # Mean FSRS recall over the tag's reviewed problems, now and after the horizon if
+    # none of them is reviewed in between.
+    recall_now: float
+    recall_later: float
+
+
+class MistakeRecovery(BaseModel):
+    kind: str
+    times: int
+    last_seen: date
+    # Reviews of problems where this mistake happened, logged after it was last seen.
+    clean_reviews_since: int
+
+
+class OverconfidentReview(BaseModel):
+    platform: str
+    problem_id: str
+    title: str
+    url: str
+    rated_easy_at: datetime
+    forgot_at: datetime
+
+
+class CalibrationBin(BaseModel):
+    # Predicted recall in [low, high).
+    low: float
+    high: float
+    reviews: int
+    predicted: float
+    recalled: float
+
+
+class Insights(BaseModel):
+    horizon_days: int
+    forecast: list[TopicForecast]
+    recovery: list[MistakeRecovery]
+    overconfidence: list[OverconfidentReview]
+    calibration: list[CalibrationBin]
+
+
 class Dashboard(BaseModel):
     progress: list[PlatformProgress]
     due: list[ReviewCard]
     patterns: MistakePatterns
+    insights: Insights

@@ -86,6 +86,8 @@ def test_an_sm2_database_moves_to_fsrs_keeping_cards_and_mistakes(tmp_path: Path
     assert record is not None
     assert (record.title, record.card.due) == ("Two Sum", datetime(2026, 1, 5, tzinfo=UTC))
     assert [m.note for m in store.mistakes(limit=10)] == ["loop bound"]
+    # Cards from before tags were stored take them from the mistakes logged on them.
+    assert [h.tags for h in store.histories()] == [["array"]]
 
 
 # 0: databases written before the schema was versioned; 1: after its first migration.
@@ -149,3 +151,23 @@ def test_patterns_count_every_tag_by_name_not_by_position(tmp_path: Path) -> Non
     counts = {c.key: c.count for c in store.patterns().by_tag}
 
     assert counts == {"graph": 2, "bfs": 1, "dfs": 1}
+
+
+def test_histories_keep_reviews_mistakes_and_latest_tags_per_card(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+    store.record_review(problem("a", ["graph"]), due_in(2), Rating.Hard, AT, [])
+    store.record_review(
+        problem("a", ["graph", "bfs"]),
+        due_in(5),
+        Rating.Again,
+        AT + timedelta(days=2),
+        [Mistake(kind="missed cycle", note="no visited set")],
+    )
+    store.record_review(problem("b"), due_in(1), Rating.Good, AT, [])
+
+    a, b = store.histories()
+
+    assert a.tags == ["graph", "bfs"]
+    assert [r for r, _ in a.reviews] == [Rating.Hard, Rating.Again]
+    assert a.mistakes == [("missed cycle", (AT + timedelta(days=2)).date())]
+    assert (b.tags, len(b.reviews), b.mistakes) == ([], 1, [])

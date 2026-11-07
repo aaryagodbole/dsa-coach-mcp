@@ -43,4 +43,44 @@ export interface Dashboard {
   progress: PlatformProgress[];
   due: ReviewCard[];
   patterns: MistakePatterns;
+  insights: Insights;
+}
+
+export interface TopicForecast {
+  tag: string;
+  problems: number;
+  recall_now: number;
+  recall_later: number;
+}
+
+export interface MistakeRecovery {
+  kind: string;
+  times: number;
+  last_seen: string;
+  clean_reviews_since: number;
+}
+
+export interface OverconfidentReview {
+  platform: string;
+  problem_id: string;
+  title: string;
+  url: string;
+  rated_easy_at: string;
+  forgot_at: string;
+}
+
+export interface CalibrationBin {
+  low: number;
+  high: number;
+  reviews: number;
+  predicted: number;
+  recalled: number;
+}
+
+export interface Insights {
+  horizon_days: number;
+  forecast: TopicForecast[];
+  recovery: MistakeRecovery[];
+  overconfidence: OverconfidentReview[];
+  calibration: CalibrationBin[];
 }

@@ -18,6 +18,7 @@ from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field
 
 from . import scheduling
+from .insights import insights as build_insights
 from .models import (
     Dashboard,
     Mistake,
@@ -51,6 +52,8 @@ server) and call record_problem with its URL, title and tags before log_review."
 # MCP Apps (io.modelcontextprotocol/ui, spec 2026-01-26): a tool names a ui:// resource
 # that hosts render as an interactive view; other hosts just show the tool's result.
 DASHBOARD_URI = "ui://dsa-coach/dashboard"
+# How far ahead the dashboard forecasts recall if nothing is revised.
+FORECAST_DAYS = 14
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 
 # Every hint is explicit: unset, destructiveHint defaults to true.
@@ -418,8 +421,11 @@ def create_server(
         days: Annotated[int | None, Field(ge=1)] = None,
     ) -> Dashboard:
         """Show the user's progress per platform, the revisions due now ordered by how
-        likely they are to be forgotten, and a heatmap of mistakes by label and tag.
-        Hosts that support MCP Apps render it as an interactive dashboard."""
+        likely they are to be forgotten, a heatmap of mistakes by label and tag, and what
+        the history says about their memory: recall per tag now and two weeks out, which
+        mistakes stopped recurring, problems rated easy then failed, and how well FSRS's
+        predictions matched. Hosts that support MCP Apps render it as an interactive
+        dashboard."""
 
         at = now()
         rows = await asyncio.to_thread(store.progress, at)
@@ -442,6 +448,9 @@ def create_server(
             ],
             due=due,
             patterns=await asyncio.to_thread(store.patterns, lookback(days)),
+            insights=build_insights(
+                await asyncio.to_thread(store.histories), fsrs, at, FORECAST_DAYS
+            ),
         )
 
     @server.prompt()

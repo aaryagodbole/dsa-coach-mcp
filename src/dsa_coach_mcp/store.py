@@ -36,6 +36,20 @@ class CardRecord:
     reviews: int
 
 
+@dataclass(frozen=True)
+class CardHistory:
+    """A card with every review and mistake logged on it, oldest first."""
+
+    platform: str
+    problem_id: str
+    title: str
+    url: str
+    tags: list[str]
+    card: Card
+    reviews: list[tuple[Rating, datetime]]
+    mistakes: list[tuple[str, date]]
+
+
 def _move_to_fsrs(conn: sqlite3.Connection) -> None:
     """Version 3: SM-2 cards become FSRS cards, reviews are logged one by one, and
     mistakes point at the new cards.
@@ -138,6 +152,19 @@ _MIGRATIONS: tuple[str | Callable[[sqlite3.Connection], None], ...] = (
         PRIMARY KEY (platform, problem_id)
     );
     """,
+    # Version 5: cards keep their problem's tags, so recall can be read per topic. Older
+    # cards take them from a recorded problem, else from the latest mistake logged on it.
+    """
+    ALTER TABLE cards ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
+    UPDATE cards SET tags = COALESCE(
+        (SELECT p.tags FROM problems p
+         WHERE p.platform = cards.platform AND p.problem_id = cards.problem_id),
+        (SELECT m.tags FROM mistakes m
+         WHERE m.platform = cards.platform AND m.problem_id = cards.problem_id
+         ORDER BY m.id DESC LIMIT 1),
+        '[]'
+    );
+    """,
 )
 
 _PARAMETERS_KEY = "fsrs_parameters"
@@ -231,15 +258,16 @@ class ReviewStore:
 
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO cards (platform, problem_id, title, url, fsrs, due) "
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (platform, problem_id) DO UPDATE "
-                "SET title = excluded.title, url = excluded.url, fsrs = excluded.fsrs, "
-                "due = excluded.due",
+                "INSERT INTO cards (platform, problem_id, title, url, tags, fsrs, due) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (platform, problem_id) DO UPDATE "
+                "SET title = excluded.title, url = excluded.url, tags = excluded.tags, "
+                "fsrs = excluded.fsrs, due = excluded.due",
                 (
                     problem.platform,
                     problem.problem_id,
                     problem.title,
                     problem.url,
+                    json.dumps(problem.tags),
                     card.to_json(),
                     card.due.astimezone(UTC).isoformat(),
                 ),
@@ -275,6 +303,44 @@ class ReviewStore:
                 (at.astimezone(UTC).isoformat(),),
             ).fetchall()
         return [_to_record(row) for row in rows]
+
+    def histories(self) -> list[CardHistory]:
+        """Every card with its reviews and mistakes. One user's history is small, and
+        reading recall over time needs all of it."""
+
+        with self._connect() as conn:
+            cards = conn.execute(
+                "SELECT id, platform, problem_id, title, url, tags, fsrs FROM cards ORDER BY id"
+            ).fetchall()
+            reviews = conn.execute(
+                "SELECT card_id, rating, reviewed_at FROM reviews ORDER BY reviewed_at, id"
+            ).fetchall()
+            mistakes = conn.execute(
+                "SELECT platform, problem_id, kind, logged_on FROM mistakes ORDER BY logged_on, id"
+            ).fetchall()
+        reviews_by_card: dict[int, list[tuple[Rating, datetime]]] = {}
+        for row in reviews:
+            reviews_by_card.setdefault(row["card_id"], []).append(
+                (Rating(row["rating"]), datetime.fromisoformat(row["reviewed_at"]))
+            )
+        mistakes_by_card: dict[tuple[str, str], list[tuple[str, date]]] = {}
+        for row in mistakes:
+            mistakes_by_card.setdefault((row["platform"], row["problem_id"]), []).append(
+                (row["kind"], date.fromisoformat(row["logged_on"]))
+            )
+        return [
+            CardHistory(
+                platform=row["platform"],
+                problem_id=row["problem_id"],
+                title=row["title"],
+                url=row["url"],
+                tags=json.loads(row["tags"]),
+                card=Card.from_json(row["fsrs"]),
+                reviews=reviews_by_card.get(row["id"], []),
+                mistakes=mistakes_by_card.get((row["platform"], row["problem_id"]), []),
+            )
+            for row in cards
+        ]
 
     def review_logs(self) -> list[ReviewLog]:
         with self._connect() as conn:
