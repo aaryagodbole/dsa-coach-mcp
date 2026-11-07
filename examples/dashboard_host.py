@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -20,36 +19,11 @@ from typing import Any
 
 from mcp import Client
 
+from dsa_coach_mcp.browser import host_page
 from dsa_coach_mcp.models import PlatformInfo, Problem, Profile
 from dsa_coach_mcp.platforms import ProblemNotFoundError
 from dsa_coach_mcp.server import DASHBOARD_URI, create_server
 from dsa_coach_mcp.store import ReviewStore
-
-HOST_PAGE = """<!doctype html>
-<html><head><meta charset="utf-8"><title>dashboard preview</title>
-<style>body{{margin:0;background:{bg}}} iframe{{border:0;width:100%;height:100vh}}</style>
-</head><body><iframe id="view" sandbox="allow-scripts"></iframe>
-<script>
-const view = document.getElementById("view");
-const result = {result};
-window.addEventListener("message", (e) => {{
-  const m = e.data;
-  if (!m || m.jsonrpc !== "2.0") return;
-  if (m.method === "ui/initialize") {{
-    view.contentWindow.postMessage({{jsonrpc: "2.0", id: m.id, result: {{
-      protocolVersion: "2026-01-26", hostInfo: {{name: "preview", version: "1"}},
-      hostCapabilities: {{}}, hostContext: {{theme: "{theme}"}}}}}}, "*");
-  }} else if (m.method === "ui/open-link") {{
-    window.open(m.params.url, "_blank", "noopener");
-    view.contentWindow.postMessage({{jsonrpc: "2.0", id: m.id, result: {{}}}}, "*");
-  }} else if (m.method === "ui/notifications/initialized") {{
-    view.contentWindow.postMessage({{jsonrpc: "2.0",
-      method: "ui/notifications/tool-result", params: result}}, "*");
-  }}
-}});
-view.srcdoc = {view};
-</script></body></html>
-"""
 
 # Sample history so every panel has something to draw. Problem ids and titles are
 # placeholders, not real problems.
@@ -131,13 +105,6 @@ async def dashboard_result(db: Path) -> dict[str, Any]:
     return {"structuredContent": result.structured_content, "view": view.contents[0].text}  # type: ignore[union-attr]
 
 
-def _script_json(value: object) -> str:
-    """JSON that is safe inside a <script> element: a literal "</script>" in the
-    dashboard's HTML would otherwise end the host page's script early."""
-
-    return json.dumps(value).replace("</", "<\\/")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--out", type=Path, default=Path("dashboard-preview.html"))
@@ -146,12 +113,7 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         data = asyncio.run(dashboard_result(Path(tmp) / "coach.db"))
-    page = HOST_PAGE.format(
-        bg="#0d1117" if args.theme == "dark" else "#ffffff",
-        theme=args.theme,
-        result=_script_json({"structuredContent": data["structuredContent"]}),
-        view=_script_json(data["view"]),
-    )
+    page = host_page(data["structuredContent"], data["view"], args.theme)
     args.out.write_text(page, encoding="utf-8")
     print(f"wrote {args.out}")
 

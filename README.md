@@ -100,6 +100,14 @@ happened), **overconfidence** (problems rated easy and failed at the next review
 It is an [MCP App](https://modelcontextprotocol.io/docs/extensions/apps):
 hosts that support them (Claude, Claude Desktop, VS Code Copilot, Goose and others) render
 it inside the conversation; every other host gets the same data as the tool's result.
+In a client that can't render MCP Apps, such as Claude Code, open it in your browser
+instead, from the same local history:
+
+```bash
+uvx dsa-coach-mcp dashboard
+```
+
+It serves the page on localhost only and stops with Ctrl+C.
 The view is a React app built into one self-contained HTML file with no external scripts, follows the host's
 light or dark theme, and talks to the host over the MCP Apps postMessage protocol.
 
