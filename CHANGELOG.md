@@ -12,6 +12,10 @@ All notable changes to this project are documented here. The format follows
   through the official MCP Apps SDK instead of hand-written postMessage code.
 - Read-only tools declare every behavior hint explicitly (`destructiveHint: false`,
   `idempotentHint: true`), since an unset `destructiveHint` defaults to true.
+- Agent evals retry rate-limited and overloaded model APIs (429 and 5xx, honoring
+  `Retry-After`) instead of ending the run on the first busy response.
+- The PyPI page describes the server as working on any judge, and its images and links
+  resolve there (the README now uses absolute links).
 
 ## [0.2.0] - 2026-11-03
 
