@@ -19,3 +19,6 @@ htmlcov/
 # Local data
 *.db
 .env
+
+# Dashboard UI dependencies
+node_modules/

@@ -94,7 +94,7 @@ flowchart LR
 `show_dashboard` is an [MCP App](https://modelcontextprotocol.io/docs/extensions/apps):
 hosts that support them (Claude, Claude Desktop, VS Code Copilot, Goose and others) render
 it inside the conversation; every other host gets the same data as the tool's result.
-The view is one self-contained HTML file with no external scripts, follows the host's
+The view is a React app built into one self-contained HTML file with no external scripts, follows the host's
 light or dark theme, and talks to the host over the MCP Apps postMessage protocol.
 
 <p align="center">
@@ -242,6 +242,14 @@ uv run pre-commit install
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
+```
+
+The dashboard is a React + TypeScript app in [`ui/`](https://github.com/aaryagodbole/dsa-coach-mcp/tree/main/ui/),
+built with Vite into the single HTML file the package serves. After changing it, rebuild
+and commit the output; CI checks they match:
+
+```bash
+cd ui && npm ci && npm run build
 ```
 
 Re-record the demo at the top of this page against live data:
