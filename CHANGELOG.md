@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format follows
   reviews (easy, then failed) and calibration of FSRS's predictions against your
   reviews. Cards now store their problem's tags; older cards take them from a recorded
   problem or the mistakes logged on them.
+- `dsa-coach-mcp dashboard` opens the dashboard in a browser, for MCP clients that
+  cannot render MCP Apps.
 
 ### Changed
 
