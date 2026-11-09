@@ -158,3 +158,113 @@ async def test_a_refusal_message_is_a_refused_turn() -> None:
     turn = await backend.start("s", "p", TOOLS).next_turn()
 
     assert turn.refused
+
+
+def flaky_server(
+    statuses: list[int], seen: list[httpx.Request], headers: dict[str, str] | None = None
+) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        status = statuses.pop(0)
+        if status != 200:
+            return httpx.Response(status, headers=headers)
+        return httpx.Response(200, json=reply({"role": "assistant", "content": "Done."}))
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+@pytest.fixture
+def sleeps(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    slept: list[float] = []
+
+    async def record(delay: float) -> None:
+        slept.append(delay)
+
+    monkeypatch.setattr("evals.backends.chat_completions.asyncio.sleep", record)
+    return slept
+
+
+async def test_an_overloaded_or_rate_limited_server_is_retried(sleeps: list[float]) -> None:
+    seen: list[httpx.Request] = []
+    http = flaky_server([503, 429, 200], seen)
+    conversation = ChatCompletionsBackend(http, "https://llm.invalid/v1", "m").start(
+        "system", "prompt", TOOLS
+    )
+
+    turn = await conversation.next_turn()
+
+    assert turn.text == "Done."
+    assert len(seen) == 3
+    assert sleeps == [2.0, 4.0]
+
+
+async def test_retry_after_sets_the_wait(sleeps: list[float]) -> None:
+    http = flaky_server([429, 200], [], headers={"Retry-After": "7"})
+    conversation = ChatCompletionsBackend(http, "https://llm.invalid/v1", "m").start(
+        "system", "prompt", TOOLS
+    )
+
+    await conversation.next_turn()
+
+    assert sleeps == [7.0]
+
+
+async def test_a_server_that_stays_overloaded_still_fails(sleeps: list[float]) -> None:
+    seen: list[httpx.Request] = []
+    http = flaky_server([503] * 6, seen)
+    conversation = ChatCompletionsBackend(http, "https://llm.invalid/v1", "m").start(
+        "system", "prompt", TOOLS
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await conversation.next_turn()
+    assert len(seen) == 6
+
+
+async def test_a_client_error_is_not_retried(sleeps: list[float]) -> None:
+    seen: list[httpx.Request] = []
+    http = flaky_server([404], seen)
+    conversation = ChatCompletionsBackend(http, "https://llm.invalid/v1", "m").start(
+        "system", "prompt", TOOLS
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await conversation.next_turn()
+    assert len(seen) == 1
+    assert sleeps == []
+
+
+def failing_server(error: Exception, seen: list[httpx.Request]) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if len(seen) == 1:
+            raise error
+        return httpx.Response(200, json=reply({"role": "assistant", "content": "Done."}))
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+async def test_a_connection_failure_is_retried(sleeps: list[float]) -> None:
+    seen: list[httpx.Request] = []
+    http = failing_server(httpx.ConnectError("refused"), seen)
+    conversation = ChatCompletionsBackend(http, "https://llm.invalid/v1", "m").start(
+        "system", "prompt", TOOLS
+    )
+
+    assert (await conversation.next_turn()).text == "Done."
+    assert len(seen) == 2
+    assert sleeps == [2.0]
+
+
+async def test_a_read_failure_is_not_retried(sleeps: list[float]) -> None:
+    # The server may have generated already; resending would pay for it twice.
+    seen: list[httpx.Request] = []
+    http = failing_server(httpx.ReadTimeout("slow"), seen)
+    conversation = ChatCompletionsBackend(http, "https://llm.invalid/v1", "m").start(
+        "system", "prompt", TOOLS
+    )
+
+    with pytest.raises(httpx.ReadTimeout):
+        await conversation.next_turn()
+    assert len(seen) == 1
+    assert sleeps == []
