@@ -5,18 +5,19 @@
 [![CI](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/dsa-coach-mcp.svg)](https://pypi.org/project/dsa-coach-mcp/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/LICENSE)
 
-An [MCP](https://modelcontextprotocol.io) server that turns your **LeetCode** and
-**Codeforces** history into a DSA coach inside Claude, Cursor or any MCP client:
-see where you stand across platforms, get problems to try next, and revise what you
-solved on a spaced-repetition schedule, with a **mistake journal** that remembers
-*why* you got things wrong and builds your next practice set around it.
+An [MCP](https://modelcontextprotocol.io) server that turns your DSA practice on any
+judge into a coach inside Claude, Cursor or any MCP client: revise what you solved on a
+spaced-repetition schedule, with a **mistake journal** that remembers *why* you got
+things wrong and builds your next practice set around it. On **LeetCode** and
+**Codeforces** it also reads your history live, shows where you stand and finds
+problems to try next; problems from any other judge are recorded as you solve them.
 
 <p align="center">
-  <img src="docs/demo.svg" alt="dsa-coach-mcp driven over stdio on live LeetCode and Codeforces data" width="820">
+  <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/demo.svg" alt="dsa-coach-mcp driven over stdio on live LeetCode and Codeforces data" width="820">
 </p>
-<p align="center"><sub>A real session, recorded by <a href="examples/demo.py"><code>examples/demo.py</code></a>: it starts the server over stdio and calls its tools on live data.</sub></p>
+<p align="center"><sub>A real session, recorded by <a href="https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/examples/demo.py"><code>examples/demo.py</code></a>: it starts the server over stdio and calls its tools on live data.</sub></p>
 
 ## Why
 
@@ -103,10 +104,10 @@ The view is a React app built into one self-contained HTML file with no external
 light or dark theme, and talks to the host over the MCP Apps postMessage protocol.
 
 <p align="center">
-  <img src="docs/dashboard-dark.png" alt="dsa-coach dashboard, dark theme" width="49%">
-  <img src="docs/dashboard-light.png" alt="dsa-coach dashboard, light theme" width="49%">
+  <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/dashboard-dark.png" alt="dsa-coach dashboard, dark theme" width="49%">
+  <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/dashboard-light.png" alt="dsa-coach dashboard, light theme" width="49%">
 </p>
-<p align="center"><sub>Rendered from sample data by <a href="examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol.</sub></p>
+<p align="center"><sub>Rendered from sample data by <a href="https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol.</sub></p>
 
 ### Any platform
 
@@ -173,7 +174,7 @@ claude mcp add dsa-coach -- uvx dsa-coach-mcp
 
 ### Agent skill
 
-[`skills/dsa-coach/SKILL.md`](skills/dsa-coach/SKILL.md) tells the agent when to reach
+[`skills/dsa-coach/SKILL.md`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/skills/dsa-coach/SKILL.md) tells the agent when to reach
 for these tools and how to use them well: how to rate a review, to reuse existing
 mistake labels, and to record problems from other platforms only from a page it read.
 For Claude Code, copy it into your skills:
@@ -201,17 +202,17 @@ handles you give it, and revision cards stay in a local SQLite file.
 ## Adding a platform
 
 1. Write `src/dsa_coach_mcp/platforms/<name>.py` with a class implementing
-   [`PlatformAdapter`](src/dsa_coach_mcp/platforms/base.py): `name`, `describe()`,
+   [`PlatformAdapter`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/src/dsa_coach_mcp/platforms/base.py): `name`, `describe()`,
    `profile()` and `search()`.
 2. Add the class to `ADAPTERS` in
-   [`platforms/__init__.py`](src/dsa_coach_mcp/platforms/__init__.py).
-3. Add tests with a mocked API, like [`tests/test_codeforces.py`](tests/test_codeforces.py).
+   [`platforms/__init__.py`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/src/dsa_coach_mcp/platforms/__init__.py).
+3. Add tests with a mocked API, like [`tests/test_codeforces.py`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/tests/test_codeforces.py).
 
 The server and tools need no changes.
 
 ## Evals
 
-Unit tests check the code; [`evals/`](evals/) checks whether a model can actually
+Unit tests check the code; [`evals/`](https://github.com/aaryagodbole/dsa-coach-mcp/tree/main/evals/) checks whether a model can actually
 coach with these tools. A model drives the real server over the MCP protocol, against a
 fixture world (one practice platform, a seeded history, a fixed clock), on tasks such
 as planning from a profile, logging a review with its mistakes, reusing an existing
@@ -232,7 +233,7 @@ EVALS_BASE_URL=<api base url> EVALS_MODEL=<model> EVALS_API_KEY=<key, if needed>
 ```
 
 The loop talks to models through a small `AgentBackend` interface
-([`evals/backends/base.py`](evals/backends/base.py)); an API with a different wire
+([`evals/backends/base.py`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/evals/backends/base.py)); an API with a different wire
 format is one more backend module. Runs never start on their own: run it locally, or
 start the **Agent evals** workflow from the Actions tab after setting the
 `EVALS_BASE_URL` and `EVALS_MODEL` repository variables (and an `EVALS_API_KEY` secret
@@ -264,8 +265,8 @@ uv run python examples/demo.py --leetcode <username> --codeforces <handle>
 ```
 
 Tests never hit the network: adapters are tested against mocked API responses. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/LICENSE)

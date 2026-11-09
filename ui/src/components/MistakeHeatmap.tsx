@@ -23,7 +23,7 @@ export function MistakeHeatmap({ patterns }: { patterns: MistakePatterns }) {
         <table>
           <thead>
             <tr>
-              <th />
+              <th><span className="sr-only">label</span></th>
               <th>total</th>
               {tags.map((t) => <th key={t}>{t}</th>)}
             </tr>
