@@ -79,14 +79,17 @@ async def dashboard_page(server: MCPServer, theme: Theme | None = None) -> str:
     return host_page(result.structured_content, resource.text, theme)
 
 
-def serve(page: str, port: int = 0, open_browser: bool = True) -> None:
-    """Serve the page on localhost until interrupted, opening it in the browser."""
+def make_server(page: str, port: int = 0) -> ThreadingHTTPServer:
+    """Bind a localhost server for the page; port 0 picks a free one."""
 
     body = page.encode("utf-8")
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            if self.path != "/":
+            bound = self.connection.getsockname()[1]
+            # A DNS-rebinding page reaches this port under its own host name.
+            allowed = {f"127.0.0.1:{bound}", f"localhost:{bound}"}
+            if self.path != "/" or self.headers.get("Host") not in allowed:
                 self.send_error(404)
                 return
             self.send_response(200)
@@ -98,7 +101,16 @@ def serve(page: str, port: int = 0, open_browser: bool = True) -> None:
         def log_message(self, format: str, *args: object) -> None:
             pass
 
-    with ThreadingHTTPServer(("127.0.0.1", port), Handler) as httpd:
+    try:
+        return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError as error:
+        raise SystemExit(f"Cannot serve the dashboard on port {port}: {error.strerror}") from error
+
+
+def serve(page: str, port: int = 0, open_browser: bool = True) -> None:
+    """Serve the page on localhost until interrupted, opening it in the browser."""
+
+    with make_server(page, port) as httpd:
         url = f"http://127.0.0.1:{httpd.server_address[1]}/"
         print(f"Dashboard at {url} (Ctrl+C to stop)")
         if open_browser:
