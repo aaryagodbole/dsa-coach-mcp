@@ -448,8 +448,12 @@ def create_server(
             ],
             due=due,
             patterns=await asyncio.to_thread(store.patterns, lookback(days)),
-            insights=build_insights(
-                await asyncio.to_thread(store.histories), fsrs, at, FORECAST_DAYS
+            insights=await asyncio.to_thread(
+                build_insights,
+                await asyncio.to_thread(store.histories),
+                fsrs,
+                at,
+                FORECAST_DAYS,
             ),
         )
 
