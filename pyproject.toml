@@ -1,7 +1,7 @@
 [project]
 name = "dsa-coach-mcp"
 version = "0.2.0"
-description = "MCP server that coaches DSA practice across LeetCode and Codeforces"
+description = "MCP server that coaches DSA practice on any judge: spaced-repetition revision and a mistake journal"
 readme = "README.md"
 license = "MIT"
 keywords = ["mcp", "model-context-protocol", "leetcode", "codeforces", "dsa", "spaced-repetition"]
