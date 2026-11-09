@@ -8,11 +8,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/LICENSE)
 
 An [MCP](https://modelcontextprotocol.io) server that turns your DSA practice on any
-judge into a coach inside Claude, Cursor or any MCP client: see where you stand across
-platforms, get problems to try next, and revise what you solved on a spaced-repetition
-schedule, with a **mistake journal** that remembers *why* you got things wrong and
-builds your next practice set around it. LeetCode and Codeforces history is read
-live; problems from any other judge are recorded as you solve them.
+judge into a coach inside Claude, Cursor or any MCP client: revise what you solved on a
+spaced-repetition schedule, with a **mistake journal** that remembers *why* you got
+things wrong and builds your next practice set around it. On **LeetCode** and
+**Codeforces** it also reads your history live, shows where you stand and finds
+problems to try next; problems from any other judge are recorded as you solve them.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/demo.svg" alt="dsa-coach-mcp driven over stdio on live LeetCode and Codeforces data" width="820">
