@@ -189,7 +189,9 @@ def create_server(
         return profile.model_copy(update={"submissions": recent[:recent_submissions]})
 
     @server.tool(annotations=_READ_REMOTE)
-    async def review_evidence(platform: str, problem_id: NonBlank, handle: str) -> ReviewEvidence:
+    async def review_evidence(
+        platform: str, problem_id: NonBlank, handle: NonBlank
+    ) -> ReviewEvidence:
         """Suggest a log_review rating from the user's submissions to this problem since
         it was last reviewed: again if none was accepted, good if the first was, hard if
         rejected ones came first. Never easy, since speed is not in the history. Where the

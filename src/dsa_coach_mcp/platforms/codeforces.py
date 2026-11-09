@@ -88,12 +88,15 @@ class CodeforcesAdapter:
             problem_id = _problem_id(row["problem"])
             if problem_id is None:
                 continue
-            accepted = row.get("verdict") == "OK"
+            verdict = row.get("verdict")
+            accepted = verdict == "OK"
             submissions.append(
                 Submission(
                     problem=_to_problem(self.name, row["problem"], problem_id),
                     accepted=accepted,
                     submitted_at=datetime.fromtimestamp(row["creationTimeSeconds"], tz=UTC),
+                    # Codeforces omits the verdict while queued and reports TESTING while judging.
+                    judged=verdict not in (None, "TESTING"),
                 )
             )
             tags_of[problem_id] = list(row["problem"].get("tags") or [])

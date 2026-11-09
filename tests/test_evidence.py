@@ -8,9 +8,14 @@ from dsa_coach_mcp.models import Problem, ReviewEvidence, Submission
 AT = datetime(2026, 2, 1, tzinfo=UTC)
 
 
-def submission(problem_id: str, accepted: bool, hours: int) -> Submission:
+def submission(problem_id: str, accepted: bool, hours: int, judged: bool = True) -> Submission:
     problem = Problem(platform="judge", problem_id=problem_id, title=problem_id, url="u")
-    return Submission(problem=problem, accepted=accepted, submitted_at=AT + timedelta(hours=hours))
+    return Submission(
+        problem=problem,
+        accepted=accepted,
+        submitted_at=AT + timedelta(hours=hours),
+        judged=judged,
+    )
 
 
 def suggest(
@@ -66,3 +71,20 @@ def test_hidden_rejections_leave_the_rating_to_the_user() -> None:
 def test_easy_is_never_suggested() -> None:
     for subs in ([submission("a", True, 1)], [submission("a", False, 1), submission("a", True, 2)]):
         assert suggest(subs).suggested_rating != "easy"
+
+
+def test_a_submission_still_being_judged_before_the_accept_withholds_the_rating() -> None:
+    e = suggest([submission("a", False, 1, judged=False), submission("a", True, 2)])
+    # Counting it as a rejection would say hard; dropping it would say good.
+    assert (e.suggested_rating, e.rejected_before_accepted) == (None, None)
+    assert "still being judged" in e.reason
+
+
+def test_a_submission_still_being_judged_with_no_accept_withholds_again() -> None:
+    e = suggest([submission("a", False, 1), submission("a", False, 2, judged=False)])
+    assert e.suggested_rating is None
+
+
+def test_a_submission_judged_after_the_accept_does_not_matter() -> None:
+    e = suggest([submission("a", True, 1), submission("a", False, 2, judged=False)])
+    assert e.suggested_rating == "good"

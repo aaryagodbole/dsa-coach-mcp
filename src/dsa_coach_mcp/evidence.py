@@ -30,11 +30,15 @@ def review_evidence(
         key=lambda s: s.submitted_at,
     )
     first_accepted = next((i for i, s in enumerate(attempts) if s.accepted), None)
-    rejected = first_accepted if first_accepted is not None else len(attempts)
+    deciding = attempts[:first_accepted] if first_accepted is not None else attempts
+    rejected = len(deciding)
 
     rating: ReviewRating | None
     if not attempts:
         rating, reason = None, "No submissions to this problem since the last review."
+    elif any(not s.judged for s in deciding):
+        rating = None
+        reason = "A submission is still being judged, so the outcome is not known yet."
     elif first_accepted is None:
         rating = ReviewRating("again") if rejections_public else None
         reason = (
@@ -60,7 +64,9 @@ def review_evidence(
         since=since,
         submissions=len(attempts),
         accepted=first_accepted is not None,
-        rejected_before_accepted=rejected if rejections_public and attempts else None,
+        rejected_before_accepted=(
+            rejected if rejections_public and attempts and all(s.judged for s in deciding) else None
+        ),
         first_submitted_at=attempts[0].submitted_at if attempts else None,
         accepted_at=attempts[first_accepted].submitted_at if first_accepted is not None else None,
         suggested_rating=rating.value if rating is not None else None,

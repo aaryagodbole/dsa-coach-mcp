@@ -25,6 +25,8 @@ class Submission(BaseModel):
     problem: Problem
     accepted: bool
     submitted_at: datetime
+    # False while the judge has not given a verdict yet, so it is neither a pass nor a fail.
+    judged: bool = True
 
 
 class Profile(BaseModel):

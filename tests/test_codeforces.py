@@ -68,6 +68,19 @@ async def test_profile_splits_solved_from_attempted_once_per_problem() -> None:
     assert profile.unsolved_attempts_by_tag == {"dp": 1, "graphs": 1}
 
 
+async def test_a_queued_or_judging_submission_is_not_yet_judged() -> None:
+    status = [
+        {"problem": problem(1, "A", ["dp"], 800), "verdict": "OK", "creationTimeSeconds": 1},
+        {"problem": problem(1, "A", ["dp"], 800), "verdict": "TESTING", "creationTimeSeconds": 2},
+        {"problem": problem(1, "A", ["dp"], 800), "creationTimeSeconds": 3},
+    ]
+    cf = adapter({"user.info": [{"handle": "bob"}], "user.status": status})
+
+    profile = await cf.profile("bob")
+
+    assert [s.judged for s in profile.submissions] == [True, False, False]
+
+
 async def test_unrated_user_has_no_level() -> None:
     cf = adapter({"user.info": [{"handle": "new"}], "user.status": []})
 
