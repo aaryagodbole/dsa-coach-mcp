@@ -253,6 +253,7 @@ async def test_a_connection_failure_is_retried(sleeps: list[float]) -> None:
 
     assert (await conversation.next_turn()).text == "Done."
     assert len(seen) == 2
+    assert sleeps == [2.0]
 
 
 async def test_a_read_failure_is_not_retried(sleeps: list[float]) -> None:
