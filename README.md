@@ -91,7 +91,13 @@ flowchart LR
 
 ### Dashboard
 
-`show_dashboard` is an [MCP App](https://modelcontextprotocol.io/docs/extensions/apps):
+`show_dashboard` shows progress per platform, the revisions due now, and what your own
+history says about your memory: a **forgetting forecast** (recall per tag now and in two
+weeks if you revise nothing), **mistake recovery** (reviews since each mistake last
+happened), **overconfidence** (problems rated easy and failed at the next review) and
+**calibration** (FSRS's predicted recall against how often you actually recalled).
+
+It is an [MCP App](https://modelcontextprotocol.io/docs/extensions/apps):
 hosts that support them (Claude, Claude Desktop, VS Code Copilot, Goose and others) render
 it inside the conversation; every other host gets the same data as the tool's result.
 The view is a React app built into one self-contained HTML file with no external scripts, follows the host's

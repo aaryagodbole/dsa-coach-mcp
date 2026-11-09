@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The dashboard shows a forgetting forecast per tag, mistake recovery, overconfident
+  reviews (easy, then failed) and calibration of FSRS's predictions against your
+  reviews. Cards now store their problem's tags; older cards take them from a recorded
+  problem or the mistakes logged on them.
+
 ### Changed
 
 - The dashboard is a React + TypeScript app built with Vite, talking to the host

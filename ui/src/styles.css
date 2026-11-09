@@ -35,6 +35,19 @@ th { font-weight: 600; color: var(--muted); }
 th.kind { text-align: left; color: var(--fg); max-width: 220px; }
 .scroll { overflow-x: auto; }
 .empty { color: var(--muted); font-style: italic; }
+:root { --line-strong: #8c959f; }
+:root[data-theme="dark"] { --line-strong: #6e7681; }
+.muted { color: var(--muted); font-size: 12px; }
+.row.forecast { grid-template-columns: 1fr 160px 90px; }
+.row.recovery { grid-template-columns: 1fr auto auto; }
+.bar.stacked { position: relative; }
+.bar.stacked span { position: absolute; left: 0; top: 0; }
+.pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.risk { color: var(--risk); }
+.pill.ok { color: var(--ok); }
+.calibration { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.calibration .empty { flex-basis: 100%; margin: 0; }
+.axis { fill: var(--muted); font-size: 9px; }
 
 .sr-only {
   position: absolute;

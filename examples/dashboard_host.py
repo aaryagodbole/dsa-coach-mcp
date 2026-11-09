@@ -75,7 +75,7 @@ SAMPLE = [
         ["good", "good"],
         [("off by one", "dp table sized n instead of n + 1")],
     ),
-    ("p-arrays-1", ["array", "two-pointers"], ["easy"], []),
+    ("p-arrays-1", ["array", "two-pointers"], ["easy", "again", "good"], []),
     ("p-strings-1", ["string"], ["hard"], [("missed edge case", "empty string")]),
 ]
 
@@ -113,14 +113,15 @@ async def dashboard_result(db: Path) -> dict[str, Any]:
     )
     async with Client(server) as client:
         for pid, _, ratings, mistakes in SAMPLE:
-            for rating in ratings:
+            for index, rating in enumerate(ratings):
+                # Mistakes come with the first attempt, so later reviews show recovery.
                 await client.call_tool(
                     "log_review",
                     {
                         "platform": "sample",
                         "problem_id": pid,
                         "rating": rating,
-                        "mistakes": [{"kind": k, "note": n} for k, n in mistakes],
+                        "mistakes": [] if index else [{"kind": k, "note": n} for k, n in mistakes],
                     },
                 )
                 clock["at"] += timedelta(days=1)

@@ -555,3 +555,9 @@ async def test_dashboard_reports_progress_due_cards_and_patterns(
     ]
     assert [c["problem_id"] for c in dashboard["due"]] == ["p0"]
     assert [k["kind"] for k in dashboard["patterns"]["kinds"]] == ["k"]
+    insights = dashboard["insights"]
+    assert insights["horizon_days"] == 14
+    assert [(m["kind"], m["times"]) for m in insights["recovery"]] == [("k", 1)]
+    (topic,) = insights["forecast"]
+    assert topic["tag"] == "graph"
+    assert topic["recall_later"] < topic["recall_now"]
