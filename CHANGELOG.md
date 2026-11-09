@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - Read-only tools declare every behavior hint explicitly (`destructiveHint: false`,
   `idempotentHint: true`), since an unset `destructiveHint` defaults to true.
+- Agent evals retry rate-limited and overloaded model APIs (429 and 5xx, honoring
+  `Retry-After`) instead of ending the run on the first busy response.
 
 ## [0.2.0] - 2026-11-03
 
