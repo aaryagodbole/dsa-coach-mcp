@@ -123,7 +123,9 @@ async def _post_with_retries(
     for delay in _RETRY_DELAYS:
         try:
             response = await http.post(url, headers=headers, json=body)
-        except httpx.TransportError:
+        # Only failures before the request reached the server: after a read failure the
+        # model may already have generated, and resending would pay for it twice.
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout):
             pass
         else:
             if response.status_code not in _TRANSIENT_STATUSES:
