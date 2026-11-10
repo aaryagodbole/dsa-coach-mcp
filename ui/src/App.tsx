@@ -2,6 +2,7 @@ import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
 import { Accounts } from "./components/Accounts";
 import { Calibration } from "./components/Calibration";
+import { Checklists } from "./components/Checklists";
 import { Coach, type SendMessage } from "./components/Coach";
 import { DueList } from "./components/DueList";
 import type { OpenLink } from "./components/ExternalLink";
@@ -10,6 +11,7 @@ import { MistakeHeatmap } from "./components/MistakeHeatmap";
 import { MistakeRecovery } from "./components/MistakeRecovery";
 import { Overconfidence } from "./components/Overconfidence";
 import { Platforms } from "./components/Platforms";
+import { SkillMap } from "./components/SkillMap";
 import type { Dashboard } from "./types";
 
 export function App() {
@@ -47,7 +49,9 @@ export function App() {
         <span className="muted">{data.due.length} due now</span>
       </header>
       <Coach steps={data.next_steps ?? []} openLink={openLink} send={send} />
+      <SkillMap skills={data.skills ?? { tags: [], unreviewed: [] }} />
       <Accounts accounts={data.accounts ?? []} />
+      <Checklists checklists={data.checklists ?? []} />
       <Platforms progress={data.progress} />
       <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />
       <DueList due={data.due} openLink={openLink} />

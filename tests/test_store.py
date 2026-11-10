@@ -184,3 +184,27 @@ def test_accounts_are_linked_replaced_and_unlinked(tmp_path: Path) -> None:
     assert store.unlink_account("leetcode") is True
     assert store.unlink_account("leetcode") is False
     assert ReviewStore(tmp_path / "coach.db").accounts() == [("codeforces", "tourist")]
+
+
+def test_mistakes_by_tag_counts_each_kind_and_keeps_the_latest_note(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+    store.record_review(
+        problem("p1", ["graph", "bfs"]),
+        due_in(3),
+        Rating.Hard,
+        AT,
+        [Mistake(kind="missed cycle", note="old note")],
+    )
+    later = AT + timedelta(days=2)
+    store.record_review(
+        problem("p2", ["graph"]),
+        due_in(3),
+        Rating.Hard,
+        later,
+        [Mistake(kind="missed cycle", note="new note")],
+    )
+
+    rows = {(tag, kind): (n, last, note) for tag, kind, n, last, note in store.mistakes_by_tag()}
+
+    assert rows[("graph", "missed cycle")] == (2, later.date(), "new note")
+    assert rows[("bfs", "missed cycle")] == (1, AT.date(), "old note")

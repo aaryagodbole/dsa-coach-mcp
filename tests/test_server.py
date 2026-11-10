@@ -742,3 +742,15 @@ async def test_weekly_report_prompt_uses_the_days_given(server: MCPServer) -> No
 
     assert "last 14 days" in text
     assert "days=14" in text
+
+
+async def test_dashboard_has_a_skill_map_and_mistake_checklists(server: MCPServer) -> None:
+    await call(server, "log_review", **REVIEW, mistakes=[{"kind": "k", "note": "watch it"}])
+
+    dashboard = await call(server, "show_dashboard")
+
+    (skill,) = dashboard["skills"]["tags"]
+    assert (skill["tag"], skill["reviewed"], skill["solved"]) == ("graph", 1, None)
+    (checklist,) = dashboard["checklists"]
+    assert checklist["tag"] == "graph"
+    assert [(i["kind"], i["note"]) for i in checklist["items"]] == [("k", "watch it")]

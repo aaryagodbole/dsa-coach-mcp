@@ -46,6 +46,33 @@ export interface Dashboard {
   insights: Insights;
   accounts: AccountStats[];
   next_steps: NextStep[];
+  skills: SkillMap;
+  checklists: TagChecklist[];
+}
+
+export interface SkillTag {
+  tag: string;
+  solved: number | null;
+  reviewed: number;
+  recall: number;
+  remembered: number;
+}
+
+export interface SkillMap {
+  tags: SkillTag[];
+  unreviewed: TagCount[];
+}
+
+export interface ChecklistItem {
+  kind: string;
+  times: number;
+  last_seen: string;
+  note: string;
+}
+
+export interface TagChecklist {
+  tag: string;
+  items: ChecklistItem[];
 }
 
 export interface NextStep {

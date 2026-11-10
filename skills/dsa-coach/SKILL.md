@@ -66,7 +66,8 @@ again. Never record a problem from memory or a guessed URL.
   its past mistakes with `list_mistakes` (`platform` and `problem_id`), ask one question
   at a time without giving the answer, then log the result.
 - `show_dashboard` shows progress, due revisions, a mistake heatmap, live stats for each
-  linked account and a few next steps picked by fixed rules; in hosts that support MCP
+  linked account, a few next steps picked by fixed rules, what the user still remembers
+  per topic and a checklist of their past mistakes per topic; in hosts that support MCP
   Apps it renders as an interactive view.
 - For a weekly report, use the `weekly_report` prompt, or follow it: build the report
   only from what the tools return, and end with three next steps that each name a

@@ -19,7 +19,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field
 
-from . import coach, evidence, scheduling
+from . import coach, evidence, scheduling, skills
 from .insights import insights as build_insights
 from .models import (
     AccountStats,
@@ -107,6 +107,7 @@ def account_stats(profile: Profile) -> AccountStats:
         struggling=top(profile.unsolved_attempts_by_tag, reverse=True),
         # Only tags not already listed as strongest, so a short history doesn't repeat them.
         least_practised=top({t: n for t, n in solved.items() if t not in shown}, reverse=False),
+        solved_by_tag=solved,
         limitations=profile.limitations,
     )
 
@@ -549,7 +550,9 @@ def create_server(
         likely they are to be forgotten, a heatmap of mistakes by label and tag, and what
         the history says about their memory: recall per tag now and two weeks out, which
         mistakes stopped recurring, problems rated easy then failed, and how well FSRS's
-        predictions matched, plus live stats for each account linked with link_account.
+        predictions matched, plus live stats for each account linked with link_account,
+        how many problems per tag the user would still get right today, and their own
+        checklist of past mistakes per tag.
         Hosts that support MCP Apps render it as an interactive dashboard."""
 
         at = now()
@@ -587,6 +590,8 @@ def create_server(
             accounts=list(await accounts),
         )
         dashboard.next_steps = coach.next_steps(due, dashboard.insights, dashboard.accounts)
+        dashboard.skills = skills.skill_map(dashboard.insights.forecast, dashboard.accounts)
+        dashboard.checklists = skills.checklists(await asyncio.to_thread(store.mistakes_by_tag))
         return dashboard
 
     @server.prompt()

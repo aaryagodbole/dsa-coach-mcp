@@ -97,6 +97,8 @@ class AccountStats(BaseModel):
     struggling: list[TagCount] = Field(default_factory=list)
     # Solved tags with the fewest problems: the user has touched them, but barely.
     least_practised: list[TagCount] = Field(default_factory=list)
+    # Every solved count per tag, as the platform names its tags.
+    solved_by_tag: dict[str, int] = Field(default_factory=dict)
     limitations: list[str] = Field(default_factory=list)
     # Set instead of the stats when the platform could not be read.
     error: str | None = None
@@ -206,6 +208,42 @@ class Insights(BaseModel):
     calibration: list[CalibrationBin]
 
 
+class SkillTag(BaseModel):
+    """What the user still knows of a topic, not just what they once solved."""
+
+    tag: str
+    # Solved on the linked accounts; None when no linked account reports this tag.
+    solved: int | None
+    # Problems with this tag reviewed in dsa-coach, so FSRS knows their memory.
+    reviewed: int
+    # Mean FSRS recall of those problems now, and how many of them that adds up to:
+    # the number the user would expect to get right today.
+    recall: float
+    remembered: float
+
+
+class SkillMap(BaseModel):
+    tags: list[SkillTag] = Field(default_factory=list)
+    # Tags solved most on the linked accounts but never reviewed here, so their
+    # memory is unknown.
+    unreviewed: list[TagCount] = Field(default_factory=list)
+
+
+class ChecklistItem(BaseModel):
+    kind: str
+    times: int
+    last_seen: date
+    # The latest note logged with this mistake on this tag, in the user's words.
+    note: str
+
+
+class TagChecklist(BaseModel):
+    """The mistakes to check for before submitting a problem with this tag."""
+
+    tag: str
+    items: list[ChecklistItem]
+
+
 class NextStep(BaseModel):
     # revise, mistake, topic or recheck.
     kind: str
@@ -223,3 +261,5 @@ class Dashboard(BaseModel):
     accounts: list[AccountStats] = Field(default_factory=list)
     # What to do next, picked from the data above by fixed rules.
     next_steps: list[NextStep] = Field(default_factory=list)
+    skills: SkillMap = Field(default_factory=SkillMap)
+    checklists: list[TagChecklist] = Field(default_factory=list)
