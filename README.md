@@ -6,6 +6,7 @@
 [![PyPI](https://img.shields.io/pypi/v/dsa-coach-mcp.svg)](https://pypi.org/project/dsa-coach-mcp/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-dashboard-c1502e.svg)](https://aaryagodbole.github.io/dsa-coach-mcp/)
 
 An [MCP](https://modelcontextprotocol.io) server that turns your DSA practice on any
 judge into a coach inside Claude, Cursor or any MCP client: revise what you solved on a
@@ -128,7 +129,7 @@ light or dark theme, and talks to the host over the MCP Apps postMessage protoco
   <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/dashboard-dark.png" alt="dsa-coach dashboard, dark theme" width="49%">
   <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/dashboard-light.png" alt="dsa-coach dashboard, light theme" width="49%">
 </p>
-<p align="center"><sub>Rendered from sample data by <a href="https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol.</sub></p>
+<p align="center"><sub>Rendered from sample data by <a href="https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol. <a href="https://aaryagodbole.github.io/dsa-coach-mcp/">Try the live demo</a>.</sub></p>
 
 ### Any platform
 
