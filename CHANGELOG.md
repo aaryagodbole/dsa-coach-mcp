@@ -12,6 +12,9 @@ All notable changes to this project are documented here. The format follows
   reviews (easy, then failed) and calibration of FSRS's predictions against your
   reviews. Cards now store their problem's tags; older cards take them from a recorded
   problem or the mistakes logged on them.
+- `review_evidence` suggests a review rating from the user's submissions since the last
+  review (again, hard or good), so ratings stop depending on self-assessment alone.
+  Profiles say whether a platform lists rejected submissions.
 - `dsa-coach-mcp dashboard` opens the dashboard in a browser, for MCP clients that
   cannot render MCP Apps.
 

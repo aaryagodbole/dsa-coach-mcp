@@ -104,6 +104,7 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
         "get_profile",
         "search_problems",
         "log_review",
+        "review_evidence",
         "revisions_due",
         "schedule_info",
         "personalize_schedule",
@@ -561,3 +562,17 @@ async def test_dashboard_reports_progress_due_cards_and_patterns(
     (topic,) = insights["forecast"]
     assert topic["tag"] == "graph"
     assert topic["recall_later"] < topic["recall_now"]
+
+
+async def test_review_evidence_reads_submissions_since_the_last_review(
+    server: MCPServer, clock: Clock
+) -> None:
+    # The fake platform lists only accepted submissions, so it never guesses a rating.
+    before = await call(server, "review_evidence", platform="fake", problem_id="p0", handle="a")
+    await call(server, "log_review", **REVIEW)
+    after = await call(server, "review_evidence", platform="fake", problem_id="p0", handle="a")
+
+    assert (before["accepted"], before["suggested_rating"], before["since"]) == (True, None, None)
+    assert "ask the user" in before["reason"]
+    assert (after["submissions"], after["suggested_rating"]) == (0, None)
+    assert after["since"] is not None
