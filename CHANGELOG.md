@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The dashboard opens with **Do this next**: up to four steps picked by fixed rules from
+  your own data (the revision most at risk, a mistake with no clean review since, a weak
+  topic, and a problem rated easy then failed), and **Weekly report**, **Plan my session**
+  and **Quiz me** buttons that send the request to your assistant in hosts that accept
+  messages from the view, or show it to paste elsewhere.
+- `weekly_report` prompt: what you did, what is slipping, recurring mistakes and three
+  next steps, for the last 7 days or the number of days given.
 - `link_account` saves your username on a platform (checking it exists) and
   `unlink_account` forgets it. `get_profile` and `review_evidence` default to the linked
   handle, and the dashboard's new **My platforms** panel shows each linked account live:

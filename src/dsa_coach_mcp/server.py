@@ -1,5 +1,7 @@
 """MCP tools. They return platform data and schedules; judging what is weak or what
-to practise next is left to the model that calls them."""
+to practise next is left to the model that calls them. The one exception is the
+dashboard's short list of next steps, picked by fixed rules (see coach.py) so the view
+is useful without a model."""
 
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field
 
-from . import evidence, scheduling
+from . import coach, evidence, scheduling
 from .insights import insights as build_insights
 from .models import (
     AccountStats,
@@ -562,7 +564,7 @@ def create_server(
             (to_card(record, at, fsrs) for record in records),
             key=lambda c: (c.retrievability is not None, c.retrievability),
         )[:limit]
-        return Dashboard(
+        dashboard = Dashboard(
             progress=[
                 PlatformProgress(
                     platform=platform,
@@ -584,6 +586,8 @@ def create_server(
             ),
             accounts=list(await accounts),
         )
+        dashboard.next_steps = coach.next_steps(due, dashboard.insights, dashboard.accounts)
+        return dashboard
 
     @server.prompt()
     def practice_plan(focus: str = "") -> str:
@@ -598,6 +602,21 @@ def create_server(
             "list_platforms or from my problems, that make me face those same mistakes "
             "again. For each "
             "problem, say which past mistake it targets and what to watch for."
+        )
+
+    @server.prompt()
+    def weekly_report(days: str = "7") -> str:
+        """Report on the user's last week of practice and say what to do next."""
+
+        return (
+            f"Give me a short coaching report on my last {days} days of DSA practice, "
+            "from my own data only. Call show_dashboard for my linked accounts, what is "
+            "due and the next steps it suggests; mistake_patterns and list_mistakes with "
+            f"days={days} for what went wrong this week; and progress for how much I "
+            "reviewed. Then write: what I did, what is slipping (problems and tags I am "
+            "forgetting), which mistakes keep coming back, and a plan of three concrete "
+            "things to do next, each naming a problem, tag or mistake from that data. If I "
+            "have not linked an account, ask for my username and save it with link_account."
         )
 
     @server.prompt()

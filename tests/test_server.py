@@ -723,3 +723,22 @@ def test_account_stats_lists_strong_struggling_and_barely_touched_tags() -> None
     # Fewest first, never repeating a strongest tag, and never a tag with nothing solved.
     assert [t.tag for t in stats.least_practised] == ["t7", "t6", "t5"]
     assert (stats.levels, stats.limitations) == ({"rating": 1500}, ["note"])
+
+
+async def test_dashboard_suggests_next_steps_from_its_own_data(
+    server: MCPServer, clock: Clock
+) -> None:
+    await call(server, "log_review", **REVIEW, mistakes=[{"kind": "k", "note": "n"}])
+    clock.at = NOW + timedelta(days=30)
+
+    steps = (await call(server, "show_dashboard"))["next_steps"]
+
+    assert [s["kind"] for s in steps][:2] == ["revise", "mistake"]
+    assert steps[0]["url"] == "https://example.com/p0"
+
+
+async def test_weekly_report_prompt_uses_the_days_given(server: MCPServer) -> None:
+    text = (await server.get_prompt("weekly_report", {"days": "14"})).messages[0].content.text
+
+    assert "last 14 days" in text
+    assert "days=14" in text

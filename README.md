@@ -90,10 +90,15 @@ flowchart LR
 | --- | --- |
 | `practice_plan` | Builds the next practice set from your recurring mistakes and progress |
 | `revision_quiz` | Quizzes you on today's revisions using what you got wrong before |
+| `weekly_report` | Reports on your last week: what you did, what's slipping, mistakes that keep coming back, and three things to do next |
 
 ### Dashboard
 
-`show_dashboard` shows **live stats for each account you linked** (solved per level or
+`show_dashboard` opens with **Do this next**: up to four steps picked from your own data
+by fixed rules (the revision you're most likely to forget, a mistake that keeps coming
+back, a weak topic, and a problem you were overconfident about), plus **Weekly report**,
+**Plan my session** and **Quiz me** buttons that ask your assistant in the chat. It then
+shows **live stats for each account you linked** (solved per level or
 your rating, your strongest tags, tags you tried and never solved, and tags you've barely
 practised), progress per platform, the revisions due now, and what your own
 history says about your memory: a **forgetting forecast** (recall per tag now and in two

@@ -47,6 +47,7 @@ async def test_dashboard_page_wraps_the_live_show_dashboard_result(tmp_path: Pat
         "patterns",
         "insights",
         "accounts",
+        "next_steps",
     }
     assert "ui/notifications/tool-result" in page
 
