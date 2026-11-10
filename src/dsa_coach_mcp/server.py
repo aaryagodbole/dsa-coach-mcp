@@ -20,6 +20,7 @@ from pydantic import AnyHttpUrl, Field
 from . import evidence, scheduling
 from .insights import insights as build_insights
 from .models import (
+    AccountStats,
     Dashboard,
     Mistake,
     MistakeEntry,
@@ -33,6 +34,7 @@ from .models import (
     ReviewCard,
     ReviewEvidence,
     ScheduleInfo,
+    TagCount,
 )
 from .platforms import PlatformAdapter, PlatformError
 from .scheduling import ReviewRating
@@ -42,6 +44,8 @@ _INSTRUCTIONS = """\
 Coach DSA practice from the user's own history on competitive-programming platforms.
 Call list_platforms first to learn each platform's tags and levels, get_profile to see
 where the user stands, and search_problems with filters you chose from that data.
+When the user tells you their username on a platform, save it with link_account; tools
+that take a handle then default to it, and the dashboard shows that account's stats.
 After the user solves or revisits a problem, record how well they recalled it with
 log_review (again, hard, good or easy). On a platform with an adapter, call
 review_evidence with their handle first: it reads the rating from their submissions,
@@ -58,6 +62,10 @@ DASHBOARD_URI = "ui://dsa-coach/dashboard"
 # How far ahead the dashboard forecasts recall if nothing is revised.
 FORECAST_DAYS = 14
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
+# How long the dashboard waits for each linked platform before showing it as unavailable.
+ACCOUNT_TIMEOUT_SECONDS = 10
+# Tags listed per account in each of the dashboard's tag lists.
+ACCOUNT_TAGS = 5
 
 # Every hint is explicit: unset, destructiveHint defaults to true.
 _READ_REMOTE = ToolAnnotations(
@@ -69,6 +77,36 @@ _READ_LOCAL = ToolAnnotations(
 _WRITE_LOCAL = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
 )
+# Linking replaces the handle saved before, so it overwrites data; it reads the platform
+# to check the handle exists.
+_LINK_ACCOUNT = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True
+)
+_UNLINK_ACCOUNT = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
+)
+
+
+def account_stats(profile: Profile) -> AccountStats:
+    """Summarise a profile for the dashboard: levels and the user's strong and weak tags."""
+
+    def top(counts: Mapping[str, int], reverse: bool) -> list[TagCount]:
+        ordered = sorted(counts.items(), key=lambda kv: ((-kv[1] if reverse else kv[1]), kv[0]))
+        return [TagCount(tag=tag, count=n) for tag, n in ordered[:ACCOUNT_TAGS] if n > 0]
+
+    solved = profile.solved_by_tag
+    strongest = top(solved, reverse=True)
+    shown = {t.tag for t in strongest}
+    return AccountStats(
+        platform=profile.platform,
+        handle=profile.handle,
+        levels=profile.level_summary,
+        strongest=strongest,
+        struggling=top(profile.unsolved_attempts_by_tag, reverse=True),
+        # Only tags not already listed as strongest, so a short history doesn't repeat them.
+        least_practised=top({t: n for t, n in solved.items() if t not in shown}, reverse=False),
+        limitations=profile.limitations,
+    )
 
 
 @asynccontextmanager
@@ -132,6 +170,37 @@ def create_server(
             raise ToolError(f"Unknown platform '{platform}'. Known: {sorted(adapters)}")
         return adapter
 
+    async def handle_for(platform: str, handle: str | None) -> str:
+        """The handle given, else the one the user linked on this platform."""
+
+        if handle and handle.strip():
+            return handle.strip()
+        linked = dict(await asyncio.to_thread(store.accounts)).get(platform)
+        if linked is None:
+            raise ToolError(
+                f"No handle given and none linked on {platform}. Ask the user for their "
+                "username, and save it with link_account."
+            )
+        return linked
+
+    async def linked_stats(platform: str, handle: str) -> AccountStats:
+        """One linked account's stats, or why they could not be read."""
+
+        adapter = adapters.get(platform)
+        if adapter is None:
+            error = "No adapter for this platform."
+            return AccountStats(platform=platform, handle=handle, error=error)
+        try:
+            async with asyncio.timeout(ACCOUNT_TIMEOUT_SECONDS):
+                return account_stats(await adapter.profile(handle))
+        except TimeoutError:
+            error = f"{platform} did not answer in {ACCOUNT_TIMEOUT_SECONDS} seconds."
+        except PlatformError as exc:
+            error = str(exc)
+        except httpx.HTTPError as exc:
+            error = f"{platform} is unreachable right now: {exc}"
+        return AccountStats(platform=platform, handle=handle, error=error)
+
     @server.tool(annotations=_READ_REMOTE)
     async def list_platforms() -> list[PlatformInfo]:
         """Connected platforms, with the tags and levels each one accepts as filters."""
@@ -177,29 +246,34 @@ def create_server(
     @server.tool(annotations=_READ_REMOTE)
     async def get_profile(
         platform: str,
-        handle: str,
+        handle: str | None = None,
         recent_submissions: Annotated[int, Field(ge=0, le=500)] = 20,
     ) -> Profile:
         """The user's standing on one platform: level, solved and unsolved counts per tag,
-        and their most recent submissions."""
+        and their most recent submissions. Without a handle, uses the one linked with
+        link_account."""
 
+        adapter = adapter_for(platform)
+        handle = await handle_for(platform, handle)
         async with _platform_errors(platform):
-            profile = await adapter_for(platform).profile(handle)
+            profile = await adapter.profile(handle)
         recent = sorted(profile.submissions, key=lambda s: s.submitted_at, reverse=True)
         return profile.model_copy(update={"submissions": recent[:recent_submissions]})
 
     @server.tool(annotations=_READ_REMOTE)
     async def review_evidence(
-        platform: str, problem_id: NonBlank, handle: NonBlank
+        platform: str, problem_id: NonBlank, handle: str | None = None
     ) -> ReviewEvidence:
         """Suggest a log_review rating from the user's submissions to this problem since
         it was last reviewed: again if none was accepted, good if the first was, hard if
         rejected ones came first. Never easy, since speed is not in the history. Where the
         platform hides rejected submissions, or nothing was submitted, it suggests
         nothing and says why; ask the user then. Tell the user the suggestion and its
-        reason, and let them overrule it."""
+        reason, and let them overrule it. Without a handle, uses the one linked with
+        link_account."""
 
         adapter = adapter_for(platform)
+        handle = await handle_for(platform, handle)
         async with _platform_errors(platform):
             # Resolved first, so the id matches the card log_review keeps for it.
             problem = await adapter.problem(problem_id)
@@ -212,6 +286,27 @@ def create_server(
             record.card.last_review if record else None,
             profile.rejections_public,
         )
+
+    @server.tool(annotations=_LINK_ACCOUNT)
+    async def link_account(platform: str, handle: NonBlank) -> AccountStats:
+        """Save the user's username on a platform, replacing any saved before, after
+        checking it exists. Tools that take a handle default to it, and show_dashboard
+        shows this account's stats. Returns those stats."""
+
+        adapter = adapter_for(platform)
+        async with _platform_errors(platform):
+            profile = await adapter.profile(handle)
+        # Saved as the platform spells it, so it matches the platform's own records.
+        await asyncio.to_thread(store.link_account, platform, profile.handle, now())
+        return account_stats(profile)
+
+    @server.tool(annotations=_UNLINK_ACCOUNT)
+    async def unlink_account(platform: str) -> str:
+        """Forget the username saved for a platform."""
+
+        if await asyncio.to_thread(store.unlink_account, platform):
+            return f"Unlinked {platform}."
+        return f"No account was linked on {platform}."
 
     @server.tool(annotations=_READ_REMOTE)
     async def search_problems(
@@ -443,7 +538,7 @@ def create_server(
 
         return files("dsa_coach_mcp").joinpath("ui/dashboard.html").read_text("utf-8")
 
-    @server.tool(annotations=_READ_LOCAL, meta={"ui": {"resourceUri": DASHBOARD_URI}})
+    @server.tool(annotations=_READ_REMOTE, meta={"ui": {"resourceUri": DASHBOARD_URI}})
     async def show_dashboard(
         limit: Annotated[int, Field(ge=1, le=100)] = 15,
         days: Annotated[int | None, Field(ge=1)] = None,
@@ -452,10 +547,14 @@ def create_server(
         likely they are to be forgotten, a heatmap of mistakes by label and tag, and what
         the history says about their memory: recall per tag now and two weeks out, which
         mistakes stopped recurring, problems rated easy then failed, and how well FSRS's
-        predictions matched. Hosts that support MCP Apps render it as an interactive
-        dashboard."""
+        predictions matched, plus live stats for each account linked with link_account.
+        Hosts that support MCP Apps render it as an interactive dashboard."""
 
         at = now()
+        linked = await asyncio.to_thread(store.accounts)
+        # Fetched together and each on its own: a slow or broken platform shows as
+        # unavailable without holding up or hiding the rest.
+        accounts = asyncio.gather(*(linked_stats(p, h) for p, h in linked))
         rows = await asyncio.to_thread(store.progress, at)
         fsrs = await scheduler()
         records = await asyncio.to_thread(store.due, at)
@@ -483,6 +582,7 @@ def create_server(
                 at,
                 FORECAST_DAYS,
             ),
+            accounts=list(await accounts),
         )
 
     @server.prompt()

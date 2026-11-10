@@ -77,6 +77,31 @@ class PlatformProgress(BaseModel):
     due_now: int
 
 
+class TagCount(BaseModel):
+    tag: str
+    count: int
+
+
+class AccountStats(BaseModel):
+    """Where the user stands on a platform they linked, read live from its API."""
+
+    platform: str
+    handle: str
+    # Accepted problems per level as the platform reports them (LeetCode: All, Easy,
+    # Medium, Hard), or its own measures (Codeforces: rating, maxRating).
+    levels: dict[str, int] = Field(default_factory=dict)
+    # Tags with the most solved problems.
+    strongest: list[TagCount] = Field(default_factory=list)
+    # Tags with problems tried but never accepted, most first; only where the platform
+    # lists failed attempts.
+    struggling: list[TagCount] = Field(default_factory=list)
+    # Solved tags with the fewest problems: the user has touched them, but barely.
+    least_practised: list[TagCount] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    # Set instead of the stats when the platform could not be read.
+    error: str | None = None
+
+
 class ScheduleInfo(BaseModel):
     personalised: bool
     reviews: int
@@ -186,3 +211,5 @@ class Dashboard(BaseModel):
     due: list[ReviewCard]
     patterns: MistakePatterns
     insights: Insights
+    # Live stats for each platform the user linked with link_account.
+    accounts: list[AccountStats] = Field(default_factory=list)

@@ -3,8 +3,8 @@ import type { PlatformProgress } from "../types";
 export function Platforms({ progress }: { progress: PlatformProgress[] }) {
   return (
     <section>
-      <h2>Platforms</h2>
-      <p className="sub">problems, reviews and what is due on each judge</p>
+      <h2>Revision progress</h2>
+      <p className="sub">problems and reviews logged here, and what is due, per judge</p>
       {progress.length === 0 && <p className="empty">No reviews yet.</p>}
       <div className="grid">
         {progress.map((p) => (

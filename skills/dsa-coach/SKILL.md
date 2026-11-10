@@ -14,8 +14,9 @@ or platform the tools did not give you.
 ## Planning practice
 
 1. Call `list_platforms` once to learn each platform's tags and levels.
-2. Call `get_profile`, with their handle, for every platform the user named whose
-   `source` is `platform`. A `reported` platform has no adapter, so neither
+2. Call `get_profile` for every platform the user named whose `source` is `platform`.
+   When the user tells you a username, save it with `link_account`; after that the
+   handle can be left out. A `reported` platform has no adapter, so neither
    `get_profile` nor `search_problems` can read it: plan from its recorded reviews
    (`progress`, `mistake_patterns`) and tell the user it cannot be searched.
 3. Combine what you read with `mistake_patterns`: the topics they solve least and the
@@ -64,8 +65,8 @@ again. Never record a problem from memory or a guessed URL.
 - For a quiz, use the `revision_quiz` prompt, or follow it: for each due problem read
   its past mistakes with `list_mistakes` (`platform` and `problem_id`), ask one question
   at a time without giving the answer, then log the result.
-- `show_dashboard` shows progress, due revisions and a mistake heatmap; in hosts that
-  support MCP Apps it renders as an interactive view.
+- `show_dashboard` shows progress, due revisions, a mistake heatmap and live stats for
+  each linked account; in hosts that support MCP Apps it renders as an interactive view.
 - After a few hundred reviews, `personalize_schedule` fits the schedule to how fast this
   user forgets. If it reports too little history, say so and carry on.
 

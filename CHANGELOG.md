@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `link_account` saves your username on a platform (checking it exists) and
+  `unlink_account` forgets it. `get_profile` and `review_evidence` default to the linked
+  handle, and the dashboard's new **My platforms** panel shows each linked account live:
+  solved per level or rating, strongest tags, tags tried and never solved, and tags barely
+  practised. A platform that is down or slow shows as unavailable without holding up the
+  rest.
+
 ### Changed
 
 - The dashboard has a new look: a cream, brown and terracotta theme with bold borders and
