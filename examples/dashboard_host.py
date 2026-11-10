@@ -6,6 +6,9 @@ sandboxed iframe, answers ui/initialize, and sends the show_dashboard result as
 ui/notifications/tool-result. Open the page in a browser, or screenshot it:
 
     uv run python examples/dashboard_host.py --out docs/dashboard-preview.html --theme dark
+
+With --demo it adds a note that the data is made up; the Pages workflow publishes that
+page as the live demo.
 """
 
 from __future__ import annotations
@@ -153,15 +156,37 @@ async def dashboard_result(db: Path) -> dict[str, Any]:
     return {"structuredContent": result.structured_content, "view": view.contents[0].text}  # type: ignore[union-attr]
 
 
+DEMO_NOTE = (
+    # The note can wrap on a phone, so the view takes whatever height is left.
+    "<style>body{display:flex;flex-direction:column;height:100vh}"
+    "iframe{flex:1;height:auto!important}</style>"
+    '<p style="margin:0;padding:8px 16px;font:600 13px/1.4 system-ui,sans-serif;'
+    'text-align:center;background:#2c1810;color:#f5e6d3">'
+    "Live demo with made-up sample data. Get your own: "
+    '<a style="color:#f08a5d" href="https://github.com/aaryagodbole/dsa-coach-mcp">'
+    "github.com/aaryagodbole/dsa-coach-mcp</a></p>"
+)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--out", type=Path, default=Path("dashboard-preview.html"))
-    parser.add_argument("--theme", choices=["light", "dark"], default="light")
+    parser.add_argument(
+        "--theme",
+        choices=["light", "dark", "auto"],
+        default="light",
+        help="auto follows the viewer's browser",
+    )
+    parser.add_argument("--demo", action="store_true", help="say the data is made up")
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as tmp:
         data = asyncio.run(dashboard_result(Path(tmp) / "coach.db"))
-    page = host_page(data["structuredContent"], data["view"], args.theme)
+    theme = None if args.theme == "auto" else args.theme
+    page = host_page(data["structuredContent"], data["view"], theme)
+    if args.demo:
+        page = page.replace("<body>", "<body>" + DEMO_NOTE, 1)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(page, encoding="utf-8")
     print(f"wrote {args.out}")
 

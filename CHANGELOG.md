@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A [live demo](https://aaryagodbole.github.io/dsa-coach-mcp/) of the dashboard with made-up sample data, published to GitHub
+  Pages from `examples/dashboard_host.py --demo` on every change to main.
 - **What you still know** on the dashboard: per topic, problems solved on your linked
   accounts, problems revised here, and how many of those you would get right today
   (the sum of their FSRS recall), plus the topics you solved most but never revised.
