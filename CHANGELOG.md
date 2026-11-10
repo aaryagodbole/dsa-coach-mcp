@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `import_solved`: start tracking the problems you already solved on a linked platform,
+  most recent first. Each problem's first accepted submission counts as its first
+  review (good on the first try, hard after rejected tries, good where the platform
+  hides rejections), so revisions are scheduled from your real history without logging
+  each problem. Tags missing from the profile are read from the problem page, and
+  problems already tracked are left alone.
 - A [live demo](https://aaryagodbole.github.io/dsa-coach-mcp/) of the dashboard with made-up sample data, published to GitHub
   Pages from `examples/dashboard_host.py --demo` on every change to main.
 - **What you still know** on the dashboard: per topic, problems solved on your linked

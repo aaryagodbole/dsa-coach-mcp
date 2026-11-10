@@ -301,6 +301,13 @@ class ReviewStore:
                 ],
             )
 
+    def tracked(self, platform: str) -> set[str]:
+        """Ids of the problems on this platform that have a card."""
+
+        with self._connect() as conn:
+            rows = conn.execute("SELECT problem_id FROM cards WHERE platform = ?", (platform,))
+            return {row["problem_id"] for row in rows}
+
     def due(self, at: datetime) -> list[CardRecord]:
         """Every card due by ``at``. One user's revision queue is small, and ranking it
         by recall needs all of it."""

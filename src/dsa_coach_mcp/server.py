@@ -24,6 +24,7 @@ from .insights import insights as build_insights
 from .models import (
     AccountStats,
     Dashboard,
+    ImportResult,
     Mistake,
     MistakeEntry,
     MistakeKind,
@@ -36,6 +37,7 @@ from .models import (
     ReviewCard,
     ReviewEvidence,
     ScheduleInfo,
+    Submission,
     TagCount,
 )
 from .platforms import PlatformAdapter, PlatformError
@@ -48,6 +50,7 @@ Call list_platforms first to learn each platform's tags and levels, get_profile 
 where the user stands, and search_problems with filters you chose from that data.
 When the user tells you their username on a platform, save it with link_account; tools
 that take a handle then default to it, and the dashboard shows that account's stats.
+Then offer import_solved, which schedules revisions for what they already solved there.
 After the user solves or revisits a problem, record how well they recalled it with
 log_review (again, hard, good or easy). On a platform with an adapter, call
 review_evidence with their handle first: it reads the rating from their submissions,
@@ -87,6 +90,13 @@ _LINK_ACCOUNT = ToolAnnotations(
 _UNLINK_ACCOUNT = ToolAnnotations(
     read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
 )
+# Importing reads the platform and adds cards, but never touches one already tracked, so a
+# second call adds nothing new.
+_IMPORT = ToolAnnotations(
+    read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
+)
+# Problem pages read at once while importing, to fill in tags the profile leaves out.
+IMPORT_CONCURRENCY = 4
 
 
 def account_stats(profile: Profile) -> AccountStats:
@@ -310,6 +320,81 @@ def create_server(
         if await asyncio.to_thread(store.unlink_account, platform):
             return f"Unlinked {platform}."
         return f"No account was linked on {platform}."
+
+    @server.tool(annotations=_IMPORT)
+    async def import_solved(
+        platform: str,
+        handle: str | None = None,
+        limit: Annotated[int, Field(ge=1, le=500)] = 100,
+    ) -> ImportResult:
+        """Start tracking the problems the user already solved on a platform, most recent
+        first, so revisions are scheduled without logging each one. Each problem's first
+        accepted submission counts as its first review: good if accepted on the first
+        try, hard after rejected tries, and good where the platform hides rejections.
+        Problems already tracked are left alone, so calling it again only adds new ones.
+        Without a handle, uses the one linked with link_account."""
+
+        adapter = adapter_for(platform)
+        handle = await handle_for(platform, handle)
+        async with _platform_errors(platform):
+            profile = await adapter.profile(handle)
+
+        first_accepted: dict[str, Submission] = {}
+        for sub in sorted(profile.submissions, key=lambda s: s.submitted_at):
+            if sub.accepted:
+                first_accepted.setdefault(sub.problem.problem_id, sub)
+        tracked = await asyncio.to_thread(store.tracked, platform)
+        new = sorted(
+            (s for pid, s in first_accepted.items() if pid not in tracked),
+            key=lambda s: s.submitted_at,
+            reverse=True,
+        )
+        chosen, remaining = new[:limit], len(new) - min(len(new), limit)
+
+        gate = asyncio.Semaphore(IMPORT_CONCURRENCY)
+
+        async def with_tags(problem: Problem) -> Problem:
+            # Some profiles list problems without tags; the problem page has them. A page
+            # that fails to load still leaves the problem worth tracking.
+            if problem.tags:
+                return problem
+            async with gate:
+                try:
+                    return await adapter.problem(problem.problem_id)
+                except (PlatformError, httpx.HTTPError):
+                    return problem
+
+        problems = await asyncio.gather(*(with_tags(s.problem) for s in chosen))
+        async with review_lock:
+            fsrs = await scheduler()
+            for sub, problem in zip(chosen, problems, strict=True):
+                found = evidence.review_evidence(
+                    platform,
+                    sub.problem.problem_id,
+                    profile.submissions,
+                    since=None,
+                    rejections_public=profile.rejections_public,
+                )
+                rating = ReviewRating(found.suggested_rating or "good")
+                card, _ = scheduling.review(fsrs, scheduling.Card(), rating, sub.submitted_at)
+                await asyncio.to_thread(
+                    store.record_review,
+                    problem,
+                    card,
+                    scheduling.to_rating(rating),
+                    sub.submitted_at,
+                    [],
+                )
+            due = await asyncio.to_thread(store.due, now())
+        return ImportResult(
+            platform=platform,
+            handle=profile.handle,
+            imported=len(chosen),
+            already_tracked=len(first_accepted) - len(new),
+            remaining=remaining,
+            due_now=len(due),
+            limitations=profile.limitations,
+        )
 
     @server.tool(annotations=_READ_REMOTE)
     async def search_problems(
