@@ -102,6 +102,8 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
     assert names == {
         "list_platforms",
         "get_profile",
+        "link_account",
+        "unlink_account",
         "search_problems",
         "log_review",
         "review_evidence",
@@ -125,8 +127,13 @@ async def test_every_tool_declares_all_four_behavior_hints(server: MCPServer) ->
         assert hints is not None, tool.name
         for hint in ("read_only_hint", "destructive_hint", "idempotent_hint", "open_world_hint"):
             assert isinstance(getattr(hints, hint), bool), (tool.name, hint)
-        # No tool deletes or overwrites data; reads are also safe to repeat.
-        assert hints.destructive_hint is False, tool.name
+        # Only the account tools overwrite or delete data, and just the saved username;
+        # reads are also safe to repeat.
+        if tool.name in {"link_account", "unlink_account"}:
+            assert hints.destructive_hint is True, tool.name
+            assert hints.idempotent_hint is True, tool.name
+        else:
+            assert hints.destructive_hint is False, tool.name
         if hints.read_only_hint:
             assert hints.idempotent_hint is True, tool.name
 
@@ -576,3 +583,143 @@ async def test_review_evidence_reads_submissions_since_the_last_review(
     assert "ask the user" in before["reason"]
     assert (after["submissions"], after["suggested_rating"]) == (0, None)
     assert after["since"] is not None
+
+
+async def test_link_account_checks_the_handle_and_saves_it(server: MCPServer) -> None:
+    stats = await call(server, "link_account", platform="fake", handle="alice")
+
+    assert (stats["platform"], stats["handle"], stats["error"]) == ("fake", "alice", None)
+    profile = await call(server, "get_profile", platform="fake")
+    assert profile["handle"] == "alice"
+
+
+async def test_link_account_rejects_an_unknown_handle_and_saves_nothing(server: MCPServer) -> None:
+    with pytest.raises(ToolError, match="not found"):
+        await server.call_tool("link_account", {"platform": "fake", "handle": "ghost"})
+
+    assert (await call(server, "show_dashboard"))["accounts"] == []
+
+
+async def test_linking_again_replaces_the_handle(server: MCPServer) -> None:
+    await call(server, "link_account", platform="fake", handle="alice")
+    await call(server, "link_account", platform="fake", handle="bob")
+
+    assert [a["handle"] for a in (await call(server, "show_dashboard"))["accounts"]] == ["bob"]
+
+
+async def test_a_handle_given_wins_over_the_linked_one(server: MCPServer) -> None:
+    await call(server, "link_account", platform="fake", handle="alice")
+
+    assert (await call(server, "get_profile", platform="fake", handle="bob"))["handle"] == "bob"
+
+
+async def test_no_handle_and_none_linked_asks_for_one(server: MCPServer) -> None:
+    for tool, args in [
+        ("get_profile", {"platform": "fake"}),
+        ("review_evidence", {"platform": "fake", "problem_id": "p0"}),
+    ]:
+        with pytest.raises(ToolError, match="link_account"):
+            await server.call_tool(tool, args)
+
+
+async def test_review_evidence_uses_the_linked_handle(server: MCPServer) -> None:
+    await call(server, "link_account", platform="fake", handle="alice")
+
+    evidence = await call(server, "review_evidence", platform="fake", problem_id="p0")
+
+    assert evidence["accepted"] is True
+
+
+async def test_unlink_account_forgets_the_handle(server: MCPServer) -> None:
+    await call(server, "link_account", platform="fake", handle="alice")
+
+    assert (await call(server, "unlink_account", platform="fake"))["result"] == "Unlinked fake."
+    assert (await call(server, "unlink_account", platform="fake"))["result"] == (
+        "No account was linked on fake."
+    )
+    assert (await call(server, "show_dashboard"))["accounts"] == []
+
+
+async def test_dashboard_shows_each_linked_account_and_survives_a_broken_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dsa_coach_mcp import server as server_module
+
+    class Broken(FakeAdapter):
+        name = "broken"
+        fail: Exception | None = None
+
+        async def profile(self, handle: str) -> Profile:
+            if self.fail:
+                raise self.fail
+            return await super().profile(handle)
+
+    class Slow(FakeAdapter):
+        name = "slow"
+        hang = False
+
+        async def profile(self, handle: str) -> Profile:
+            if self.hang:
+                await asyncio.sleep(10)
+            return await super().profile(handle)
+
+    broken, slow = Broken(), Slow()
+    monkeypatch.setattr(server_module, "ACCOUNT_TIMEOUT_SECONDS", 0.05)
+    store = ReviewStore(tmp_path / "c.db")
+    app = create_server(
+        {"fake": FakeAdapter(), "broken": broken, "slow": slow}, store, now=Clock(), fuzz=False
+    )
+    for platform in ("fake", "broken", "slow"):
+        await call(app, "link_account", platform=platform, handle="alice")
+    # A platform that was linked earlier but has no adapter now.
+    store.link_account("gone", "alice", NOW)
+    broken.fail = UserNotFoundError("fake user 'alice' not found")
+    slow.hang = True
+
+    accounts = {a["platform"]: a for a in (await call(app, "show_dashboard"))["accounts"]}
+
+    assert sorted(accounts) == ["broken", "fake", "gone", "slow"]
+    assert accounts["fake"]["error"] is None
+    assert accounts["broken"]["error"] == "fake user 'alice' not found"
+    assert "did not answer" in accounts["slow"]["error"]
+    assert accounts["gone"]["error"] == "No adapter for this platform."
+
+
+async def test_dashboard_reports_an_unreachable_platform(tmp_path: Path) -> None:
+    import httpx
+
+    class Offline(FakeAdapter):
+        async def profile(self, handle: str) -> Profile:
+            if handle == "offline":
+                raise httpx.ConnectError("no route")
+            return await super().profile(handle)
+
+    store = ReviewStore(tmp_path / "c.db")
+    app = create_server({"fake": Offline()}, store, now=Clock(), fuzz=False)
+    store.link_account("fake", "offline", NOW)
+
+    (account,) = (await call(app, "show_dashboard"))["accounts"]
+
+    assert account["error"] == "fake is unreachable right now: no route"
+
+
+def test_account_stats_lists_strong_struggling_and_barely_touched_tags() -> None:
+    from dsa_coach_mcp.server import account_stats
+
+    solved = {f"t{i}": 10 - i for i in range(8)} | {"zero": 0}
+    stats = account_stats(
+        Profile(
+            platform="codeforces",
+            handle="alice",
+            level_summary={"rating": 1500},
+            solved_by_tag=solved,
+            unsolved_attempts_by_tag={"dp": 3, "graphs": 5, "math": 0},
+            limitations=["note"],
+        )
+    )
+
+    assert [t.tag for t in stats.strongest] == ["t0", "t1", "t2", "t3", "t4"]
+    assert [(t.tag, t.count) for t in stats.struggling] == [("graphs", 5), ("dp", 3)]
+    # Fewest first, never repeating a strongest tag, and never a tag with nothing solved.
+    assert [t.tag for t in stats.least_practised] == ["t7", "t6", "t5"]
+    assert (stats.levels, stats.limitations) == ({"rating": 1500}, ["note"])

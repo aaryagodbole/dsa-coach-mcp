@@ -55,6 +55,20 @@ h2 { font-size: 17px; font-weight: 900; text-transform: uppercase; letter-spacin
 .stats { display: flex; gap: 14px; margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .stats b { color: var(--fg); font-size: 20px; font-weight: 900; display: block; line-height: 1.1; }
 
+/* Linked accounts. */
+.grid.accounts { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.account .name { font-size: 16px; }
+.tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.tags-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+              color: var(--muted); margin-right: 2px; }
+.chip { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border: 2px solid currentColor;
+        border-radius: 4px; background: var(--card); }
+.chip b { font-weight: 900; margin-left: 2px; }
+.chip.ok { color: var(--ok); }
+.chip.risk { color: var(--risk); }
+.chip.mid { color: var(--mid); }
+.limit { margin: 8px 0 0; font-style: italic; }
+
 /* Rows with recall bars. */
 .due { display: grid; gap: 8px; }
 .row { display: grid; grid-template-columns: 1fr 120px 44px; gap: 10px; align-items: center; }

@@ -1,5 +1,6 @@
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
+import { Accounts } from "./components/Accounts";
 import { Calibration } from "./components/Calibration";
 import { DueList } from "./components/DueList";
 import type { OpenLink } from "./components/ExternalLink";
@@ -33,6 +34,7 @@ export function App() {
         <div className="logo">DSA COACH</div>
         <span className="muted">{data.due.length} due now</span>
       </header>
+      <Accounts accounts={data.accounts ?? []} />
       <Platforms progress={data.progress} />
       <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />
       <DueList due={data.due} openLink={openLink} />

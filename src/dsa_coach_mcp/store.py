@@ -165,6 +165,14 @@ _MIGRATIONS: tuple[str | Callable[[sqlite3.Connection], None], ...] = (
         '[]'
     );
     """,
+    # Version 6: the user's own handle on each platform, so views can read their stats.
+    """
+    CREATE TABLE accounts (
+        platform  TEXT PRIMARY KEY,
+        handle    TEXT NOT NULL,
+        linked_at TEXT NOT NULL
+    );
+    """,
 )
 
 _PARAMETERS_KEY = "fsrs_parameters"
@@ -419,6 +427,32 @@ class ReviewStore:
                 (at.astimezone(UTC).isoformat(),),
             ).fetchall()
         return [(r["platform"], r["problems"], r["reviews"], r["due_now"]) for r in rows]
+
+    def accounts(self) -> list[tuple[str, str]]:
+        """The user's linked (platform, handle) pairs, by platform."""
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT platform, handle FROM accounts ORDER BY platform"
+            ).fetchall()
+        return [(r["platform"], r["handle"]) for r in rows]
+
+    def link_account(self, platform: str, handle: str, at: datetime) -> None:
+        """Link the user's handle on a platform, replacing any handle linked before."""
+
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO accounts (platform, handle, linked_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (platform) DO UPDATE SET "
+                "handle = excluded.handle, linked_at = excluded.linked_at",
+                (platform, handle, at.astimezone(UTC).isoformat()),
+            )
+
+    def unlink_account(self, platform: str) -> bool:
+        """Forget the handle linked on a platform; False if none was linked."""
+
+        with self._connect() as conn:
+            return conn.execute("DELETE FROM accounts WHERE platform = ?", (platform,)).rowcount > 0
 
     def parameters(self) -> list[float] | None:
         with self._connect() as conn:

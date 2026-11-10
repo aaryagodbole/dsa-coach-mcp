@@ -62,7 +62,24 @@ class SampleAdapter:
         return PlatformInfo(name=self.name, tags=[], levels=[])
 
     async def profile(self, handle: str) -> Profile:
-        return Profile(platform=self.name, handle=handle)
+        # Placeholder stats for the linked-account panel, counted per level as LeetCode does.
+        return Profile(
+            platform=self.name,
+            handle=handle,
+            level_summary={"All": 214, "Easy": 96, "Medium": 101, "Hard": 17},
+            solved_by_tag={
+                "array": 120,
+                "string": 64,
+                "hash-table": 58,
+                "dynamic-programming": 31,
+                "tree": 29,
+                "graph": 14,
+                "greedy": 22,
+                "binary-search": 18,
+                "trie": 3,
+                "segment-tree": 1,
+            },
+        )
 
     async def search(self, tags: list[str], level: str | None, limit: int) -> list[Problem]:
         return []
@@ -80,12 +97,43 @@ class SampleAdapter:
         raise ProblemNotFoundError(problem_id)
 
 
+class SampleRatedAdapter(SampleAdapter):
+    """A second placeholder judge that rates users and lists failed attempts, as
+    Codeforces does."""
+
+    name = "sample-rated"
+
+    async def profile(self, handle: str) -> Profile:
+        return Profile(
+            platform=self.name,
+            handle=handle,
+            level_summary={"rating": 1432, "maxRating": 1519},
+            solved_by_tag={
+                "implementation": 88,
+                "math": 61,
+                "greedy": 57,
+                "brute force": 33,
+                "constructive algorithms": 21,
+                "dp": 9,
+                "graphs": 6,
+                "dsu": 2,
+            },
+            unsolved_attempts_by_tag={"dp": 7, "graphs": 4, "math": 3, "binary search": 2},
+            rejections_public=True,
+        )
+
+
 async def dashboard_result(db: Path) -> dict[str, Any]:
     clock = {"at": datetime(2026, 1, 1, tzinfo=UTC)}
     server = create_server(
-        {"sample": SampleAdapter()}, ReviewStore(db), now=lambda: clock["at"], fuzz=False
+        {"sample": SampleAdapter(), "sample-rated": SampleRatedAdapter()},
+        ReviewStore(db),
+        now=lambda: clock["at"],
+        fuzz=False,
     )
     async with Client(server) as client:
+        for platform in ("sample", "sample-rated"):
+            await client.call_tool("link_account", {"platform": platform, "handle": "you"})
         for pid, _, ratings, mistakes in SAMPLE:
             for index, rating in enumerate(ratings):
                 # Mistakes come with the first attempt, so later reviews show recovery.

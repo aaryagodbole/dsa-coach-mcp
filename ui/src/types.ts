@@ -44,6 +44,23 @@ export interface Dashboard {
   due: ReviewCard[];
   patterns: MistakePatterns;
   insights: Insights;
+  accounts: AccountStats[];
+}
+
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+export interface AccountStats {
+  platform: string;
+  handle: string;
+  levels: Record<string, number>;
+  strongest: TagCount[];
+  struggling: TagCount[];
+  least_practised: TagCount[];
+  limitations: string[];
+  error: string | null;
 }
 
 export interface TopicForecast {

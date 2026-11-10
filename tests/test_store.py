@@ -171,3 +171,16 @@ def test_histories_keep_reviews_mistakes_and_latest_tags_per_card(tmp_path: Path
     assert [r for r, _ in a.reviews] == [Rating.Hard, Rating.Again]
     assert a.mistakes == [("missed cycle", (AT + timedelta(days=2)).date())]
     assert (b.tags, len(b.reviews), b.mistakes) == ([], 1, [])
+
+
+def test_accounts_are_linked_replaced_and_unlinked(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+
+    store.link_account("leetcode", "alice", AT)
+    store.link_account("codeforces", "tourist", AT)
+    store.link_account("leetcode", "bob", AT)
+
+    assert store.accounts() == [("codeforces", "tourist"), ("leetcode", "bob")]
+    assert store.unlink_account("leetcode") is True
+    assert store.unlink_account("leetcode") is False
+    assert ReviewStore(tmp_path / "coach.db").accounts() == [("codeforces", "tourist")]

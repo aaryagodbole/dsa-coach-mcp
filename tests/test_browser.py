@@ -41,7 +41,13 @@ async def test_dashboard_page_wraps_the_live_show_dashboard_result(tmp_path: Pat
 
     result = script_json(page, "result")
     assert isinstance(result, dict)
-    assert set(result["structuredContent"]) == {"progress", "due", "patterns", "insights"}
+    assert set(result["structuredContent"]) == {
+        "progress",
+        "due",
+        "patterns",
+        "insights",
+        "accounts",
+    }
     assert "ui/notifications/tool-result" in page
 
 
