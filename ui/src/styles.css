@@ -55,6 +55,35 @@ h2 { font-size: 17px; font-weight: 900; text-transform: uppercase; letter-spacin
 .stats { display: flex; gap: 14px; margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .stats b { color: var(--fg); font-size: 20px; font-weight: 900; display: block; line-height: 1.1; }
 
+/* Coach: next steps and requests to the assistant. */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.step { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+.step .icon {
+  width: 30px; height: 30px; display: grid; place-items: center; font-weight: 900;
+  border: 2px solid var(--ink); border-radius: 6px; box-shadow: 2px 2px 0 var(--ink);
+  background: var(--accent); color: var(--on-accent);
+}
+.step.mistake .icon { background: var(--risk); }
+.step.topic .icon { background: var(--mid); }
+.step-title { font-weight: 800; }
+.step-title a { color: var(--fg); text-decoration: underline; text-decoration-thickness: 2px;
+                text-underline-offset: 2px; }
+.step-title a:hover { color: var(--accent-ink); }
+.asks { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.asks button {
+  font: inherit; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em;
+  padding: 7px 14px; cursor: pointer; border: 2px solid var(--ink); border-radius: 6px;
+  background: var(--accent); color: var(--on-accent); box-shadow: 3px 3px 0 var(--ink);
+  transition: transform .12s, box-shadow .12s;
+}
+.asks button:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+.asks button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.asks button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.manual { margin-top: 10px; }
+.manual code { display: block; padding: 8px 10px; background: var(--bg); border: 2px dashed var(--ink);
+               font-size: 12px; overflow-wrap: anywhere; user-select: all; }
+@media (prefers-reduced-motion: reduce) { .asks button { transition: none; } }
+
 /* Linked accounts. */
 .grid.accounts { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .account .name { font-size: 16px; }

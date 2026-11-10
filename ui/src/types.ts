@@ -45,6 +45,14 @@ export interface Dashboard {
   patterns: MistakePatterns;
   insights: Insights;
   accounts: AccountStats[];
+  next_steps: NextStep[];
+}
+
+export interface NextStep {
+  kind: "revise" | "mistake" | "topic" | "recheck";
+  title: string;
+  detail: string;
+  url: string | null;
 }
 
 export interface TagCount {

@@ -2,6 +2,7 @@ import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
 import { Accounts } from "./components/Accounts";
 import { Calibration } from "./components/Calibration";
+import { Coach, type SendMessage } from "./components/Coach";
 import { DueList } from "./components/DueList";
 import type { OpenLink } from "./components/ExternalLink";
 import { ForgettingForecast } from "./components/ForgettingForecast";
@@ -27,6 +28,17 @@ export function App() {
   if (error) return <p className="status empty">Couldn't connect to the host: {error.message}</p>;
   if (!data) return <p className="status empty">Waiting for data…</p>;
   const openLink: OpenLink = (url) => app?.openLink({ url });
+  // Only hosts that accept messages from the view can take a request into the chat.
+  const send: SendMessage | null = app?.getHostCapabilities()?.message
+    ? async (text) => {
+        try {
+          const result = await app.sendMessage({ role: "user", content: [{ type: "text", text }] });
+          return !result.isError;
+        } catch {
+          return false;
+        }
+      }
+    : null;
   const { insights } = data;
   return (
     <main>
@@ -34,6 +46,7 @@ export function App() {
         <div className="logo">DSA COACH</div>
         <span className="muted">{data.due.length} due now</span>
       </header>
+      <Coach steps={data.next_steps ?? []} openLink={openLink} send={send} />
       <Accounts accounts={data.accounts ?? []} />
       <Platforms progress={data.progress} />
       <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />

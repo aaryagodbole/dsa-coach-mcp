@@ -65,8 +65,12 @@ again. Never record a problem from memory or a guessed URL.
 - For a quiz, use the `revision_quiz` prompt, or follow it: for each due problem read
   its past mistakes with `list_mistakes` (`platform` and `problem_id`), ask one question
   at a time without giving the answer, then log the result.
-- `show_dashboard` shows progress, due revisions, a mistake heatmap and live stats for
-  each linked account; in hosts that support MCP Apps it renders as an interactive view.
+- `show_dashboard` shows progress, due revisions, a mistake heatmap, live stats for each
+  linked account and a few next steps picked by fixed rules; in hosts that support MCP
+  Apps it renders as an interactive view.
+- For a weekly report, use the `weekly_report` prompt, or follow it: build the report
+  only from what the tools return, and end with three next steps that each name a
+  problem, tag or mistake from that data.
 - After a few hundred reviews, `personalize_schedule` fits the schedule to how fast this
   user forgets. If it reports too little history, say so and carry on.
 

@@ -206,6 +206,14 @@ class Insights(BaseModel):
     calibration: list[CalibrationBin]
 
 
+class NextStep(BaseModel):
+    # revise, mistake, topic or recheck.
+    kind: str
+    title: str
+    detail: str
+    url: str | None = None
+
+
 class Dashboard(BaseModel):
     progress: list[PlatformProgress]
     due: list[ReviewCard]
@@ -213,3 +221,5 @@ class Dashboard(BaseModel):
     insights: Insights
     # Live stats for each platform the user linked with link_account.
     accounts: list[AccountStats] = Field(default_factory=list)
+    # What to do next, picked from the data above by fixed rules.
+    next_steps: list[NextStep] = Field(default_factory=list)
