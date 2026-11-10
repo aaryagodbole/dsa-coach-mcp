@@ -6,6 +6,7 @@ is useful without a model."""
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
@@ -339,8 +340,10 @@ def create_server(
         async with _platform_errors(platform):
             profile = await adapter.profile(handle)
 
+        attempts: dict[str, list[Submission]] = defaultdict(list)
         first_accepted: dict[str, Submission] = {}
         for sub in sorted(profile.submissions, key=lambda s: s.submitted_at):
+            attempts[sub.problem.problem_id].append(sub)
             if sub.accepted:
                 first_accepted.setdefault(sub.problem.problem_id, sub)
         tracked = await asyncio.to_thread(store.tracked, platform)
@@ -365,13 +368,18 @@ def create_server(
                     return problem
 
         problems = await asyncio.gather(*(with_tags(s.problem) for s in chosen))
+        imported = 0
         async with review_lock:
+            # Read again: a review logged while the tags loaded must not be overwritten.
+            tracked = await asyncio.to_thread(store.tracked, platform)
             fsrs = await scheduler()
             for sub, problem in zip(chosen, problems, strict=True):
+                if sub.problem.problem_id in tracked:
+                    continue
                 found = evidence.review_evidence(
                     platform,
                     sub.problem.problem_id,
-                    profile.submissions,
+                    attempts[sub.problem.problem_id],
                     since=None,
                     rejections_public=profile.rejections_public,
                 )
@@ -385,12 +393,13 @@ def create_server(
                     sub.submitted_at,
                     [],
                 )
+                imported += 1
             due = await asyncio.to_thread(store.due, now())
         return ImportResult(
             platform=platform,
             handle=profile.handle,
-            imported=len(chosen),
-            already_tracked=len(first_accepted) - len(new),
+            imported=imported,
+            already_tracked=len(first_accepted) - len(new) + len(chosen) - imported,
             remaining=remaining,
             due_now=len(due),
             limitations=profile.limitations,

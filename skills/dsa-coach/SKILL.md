@@ -19,7 +19,8 @@ or platform the tools did not give you.
    handle can be left out. Then offer `import_solved`: it tracks the problems they
    already solved there, counting each first accept as a review, so revisions start
    from their real history instead of an empty one. Say how many it imported and
-   how many are due now. A `reported` platform has no adapter, so neither
+   how many are due now; if `remaining` is above zero, say how many older problems
+   are still untracked and offer to import them too. A `reported` platform has no adapter, so neither
    `get_profile` nor `search_problems` can read it: plan from its recorded reviews
    (`progress`, `mistake_patterns`) and tell the user it cannot be searched.
 3. Combine what you read with `mistake_patterns`: the topics they solve least and the

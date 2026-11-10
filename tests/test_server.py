@@ -882,3 +882,27 @@ async def test_import_solved_needs_a_known_handle(judge: MCPServer) -> None:
         await judge.call_tool("import_solved", {"platform": "judge"})
     with pytest.raises(ToolError, match="not found"):
         await judge.call_tool("import_solved", {"platform": "judge", "handle": "ghost"})
+
+
+async def test_import_solved_skips_a_problem_reviewed_while_it_ran(
+    judge_store: ReviewStore, clock: Clock
+) -> None:
+    adapter = JudgeAdapter()
+    server = create_server({"judge": adapter}, judge_store, now=clock, fuzz=False)
+    original = adapter.problem
+    reviewed = False
+
+    async def problem(problem_id: str) -> Problem:
+        # The user logs a review of j1 while the import is still loading tags.
+        nonlocal reviewed
+        if not reviewed:
+            reviewed = True
+            await call(server, "log_review", platform="judge", problem_id="j1", rating="easy")
+        return await original(problem_id)
+
+    adapter.problem = problem  # type: ignore[method-assign]
+    result = await call(server, "import_solved", platform="judge", handle="ann")
+
+    assert (result["imported"], result["already_tracked"]) == (2, 1)
+    j1 = next(h for h in judge_store.histories() if h.problem_id == "j1")
+    assert [rating for rating, _ in j1.reviews] == [fsrs.Rating.Easy]
