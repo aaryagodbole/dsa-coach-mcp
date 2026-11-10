@@ -28,17 +28,17 @@ from dsa_coach_mcp.platforms import ProblemNotFoundError
 from dsa_coach_mcp.server import DASHBOARD_URI, create_server
 from dsa_coach_mcp.store import ReviewStore
 
-# Sample history so every panel has something to draw. Problem ids and titles are
-# placeholders, not real problems.
+# Sample history so every panel has something to draw. The problems are generic
+# exercises on a placeholder judge, not problems from a real one.
 SAMPLE = [
     (
-        "p-graphs-1",
+        "shortest-path-in-a-grid",
         ["graph", "bfs"],
         ["again", "hard"],
         [("missed cycle detection", "no visited set on the back edge")],
     ),
     (
-        "p-graphs-2",
+        "cycle-in-a-directed-graph",
         ["graph", "dfs"],
         ["hard"],
         [
@@ -47,13 +47,13 @@ SAMPLE = [
         ],
     ),
     (
-        "p-dp-1",
+        "longest-increasing-subsequence",
         ["dynamic-programming"],
         ["good", "good"],
         [("off by one", "dp table sized n instead of n + 1")],
     ),
-    ("p-arrays-1", ["array", "two-pointers"], ["easy", "again", "good"], []),
-    ("p-strings-1", ["string"], ["hard"], [("missed edge case", "empty string")]),
+    ("pair-with-target-sum", ["array", "two-pointers"], ["easy", "again", "good"], []),
+    ("longest-palindromic-substring", ["string"], ["hard"], [("missed edge case", "empty string")]),
 ]
 
 
@@ -93,7 +93,7 @@ class SampleAdapter:
                 return Problem(
                     platform=self.name,
                     problem_id=pid,
-                    title=pid.replace("-", " "),
+                    title=pid.replace("-", " ").capitalize(),
                     url=f"https://sample.invalid/{pid}",
                     tags=tags,
                 )
