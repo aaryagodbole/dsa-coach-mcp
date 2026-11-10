@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **What you still know** on the dashboard: per topic, problems solved on your linked
+  accounts, problems revised here, and how many of those you would get right today
+  (the sum of their FSRS recall), plus the topics you solved most but never revised.
+- **Before you submit** on the dashboard: a checklist per topic built from your own
+  mistake journal, most frequent mistake first, each with the latest note you logged.
 - The dashboard opens with **Do this next**: up to four steps picked by fixed rules from
   your own data (the revision most at risk, a mistake with no clean review since, a weak
   topic, and a problem rated easy then failed), and **Weekly report**, **Plan my session**

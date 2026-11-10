@@ -507,6 +507,23 @@ class ReviewStore:
             ).fetchall()
         return [_to_entry(row) for row in rows]
 
+    def mistakes_by_tag(self) -> list[tuple[str, str, int, date, str]]:
+        """Per tag and mistake kind: how often, when last, and the latest note."""
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT t.value AS tag, m.kind AS kind, COUNT(*) AS times, "
+                "MAX(m.logged_on) AS last_seen, "
+                "(SELECT m2.note FROM mistakes m2, json_each(m2.tags) t2 "
+                " WHERE t2.value = t.value AND m2.kind = m.kind "
+                " ORDER BY m2.logged_on DESC, m2.id DESC LIMIT 1) AS note "
+                "FROM mistakes m, json_each(m.tags) t GROUP BY t.value, m.kind"
+            ).fetchall()
+        return [
+            (r["tag"], r["kind"], r["times"], date.fromisoformat(r["last_seen"]), r["note"])
+            for r in rows
+        ]
+
     def patterns(self, since: date | None = None) -> MistakePatterns:
         where, params = self._filters(since=since)
         with self._connect() as conn:

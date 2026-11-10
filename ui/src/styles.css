@@ -84,6 +84,20 @@ h2 { font-size: 17px; font-weight: 900; text-transform: uppercase; letter-spacin
                font-size: 12px; overflow-wrap: anywhere; user-select: all; }
 @media (prefers-reduced-motion: reduce) { .asks button { transition: none; } }
 
+/* Skill map and checklists. */
+.row.skill { grid-template-columns: 1fr 160px 44px; }
+.row.skill .name { font-weight: 800; }
+.row.skill .muted b { color: var(--fg); }
+.grid.checklists { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.checklist ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.checklist label { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; cursor: pointer; }
+.checklist input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); }
+.checklist .kind { font-weight: 800; display: block; }
+.checklist .meta { display: block; }
+.checklist .note { display: block; color: var(--muted); font-size: 12px; font-style: italic; }
+.checklist input:checked + span { opacity: .55; }
+.checklist input:checked + span .kind { text-decoration: line-through; text-decoration-thickness: 2px; }
+
 /* Linked accounts. */
 .grid.accounts { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .account .name { font-size: 16px; }

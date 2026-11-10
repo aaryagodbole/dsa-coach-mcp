@@ -97,7 +97,11 @@ flowchart LR
 `show_dashboard` opens with **Do this next**: up to four steps picked from your own data
 by fixed rules (the revision you're most likely to forget, a mistake that keeps coming
 back, a weak topic, and a problem you were overconfident about), plus **Weekly report**,
-**Plan my session** and **Quiz me** buttons that ask your assistant in the chat. It then
+**Plan my session** and **Quiz me** buttons that ask your assistant in the chat.
+**What you still know** sets what you solved per topic against how many of the problems
+you revised you'd still get right today (FSRS recall), and lists topics you solved but
+never revised. **Before you submit** turns your mistake journal into a checklist per
+topic, most frequent mistake first, with your own note on each. It then
 shows **live stats for each account you linked** (solved per level or
 your rating, your strongest tags, tags you tried and never solved, and tags you've barely
 practised), progress per platform, the revisions due now, and what your own
