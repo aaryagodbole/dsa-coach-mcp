@@ -104,6 +104,7 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
         "get_profile",
         "link_account",
         "unlink_account",
+        "import_solved",
         "search_problems",
         "log_review",
         "review_evidence",
@@ -754,3 +755,154 @@ async def test_dashboard_has_a_skill_map_and_mistake_checklists(server: MCPServe
     (checklist,) = dashboard["checklists"]
     assert checklist["tag"] == "graph"
     assert [(i["kind"], i["note"]) for i in checklist["items"]] == [("k", "watch it")]
+
+
+class JudgeAdapter(FakeAdapter):
+    """A judge that lists rejected submissions, as Codeforces does, and whose profile
+    leaves some problems' tags out, as LeetCode's does."""
+
+    name = "judge"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.problems = [
+            Problem(platform="judge", problem_id=f"j{i}", title=f"j{i}", url=f"https://j/{i}")
+            for i in range(4)
+        ]
+        self.tagged = {"j0": ["dp"], "j1": ["graph"]}
+
+    async def profile(self, handle: str) -> Profile:
+        if handle == "ghost":
+            raise UserNotFoundError("judge user 'ghost' not found")
+
+        def sub(i: int, day: int, accepted: bool) -> Submission:
+            return Submission(
+                problem=self.problems[i],
+                accepted=accepted,
+                submitted_at=datetime(2025, 12, day, tzinfo=UTC),
+            )
+
+        return Profile(
+            platform=self.name,
+            handle=handle.upper(),
+            submissions=[
+                sub(0, 1, True),  # first try
+                sub(1, 2, False),
+                sub(1, 3, True),  # after one rejection
+                sub(1, 4, True),  # solved again: only the first accept counts
+                sub(2, 5, True),  # its page fails to load
+                sub(3, 6, False),  # never solved
+            ],
+            rejections_public=True,
+            limitations=["partial"],
+        )
+
+    async def problem(self, problem_id: str) -> Problem:
+        if problem_id == "j2":
+            raise ProblemNotFoundError("gone")
+        base = next(p for p in self.problems if p.problem_id == problem_id)
+        return base.model_copy(update={"tags": self.tagged.get(problem_id, [])})
+
+
+@pytest.fixture
+def judge_store(tmp_path: Path) -> ReviewStore:
+    return ReviewStore(tmp_path / "judge.db")
+
+
+@pytest.fixture
+def judge(judge_store: ReviewStore, clock: Clock) -> MCPServer:
+    return create_server(
+        {"judge": JudgeAdapter(), "fake": FakeAdapter()}, judge_store, now=clock, fuzz=False
+    )
+
+
+async def test_import_solved_counts_each_first_accept_as_a_review(
+    judge: MCPServer, judge_store: ReviewStore
+) -> None:
+    result = await call(judge, "import_solved", platform="judge", handle="ann")
+
+    assert result == {
+        "platform": "judge",
+        "handle": "ANN",
+        "imported": 3,
+        "already_tracked": 0,
+        "remaining": 0,
+        "due_now": 3,
+        "limitations": ["partial"],
+    }
+    history = {h.problem_id: h for h in judge_store.histories()}
+    assert sorted(history) == ["j0", "j1", "j2"]
+    assert history["j0"].reviews == [(fsrs.Rating.Good, datetime(2025, 12, 1, tzinfo=UTC))]
+    assert history["j1"].reviews == [(fsrs.Rating.Hard, datetime(2025, 12, 3, tzinfo=UTC))]
+    # Tags come from the problem page; a page that fails still leaves the problem tracked.
+    assert (history["j0"].tags, history["j1"].tags, history["j2"].tags) == (
+        ["dp"],
+        ["graph"],
+        [],
+    )
+
+
+async def test_import_solved_again_leaves_tracked_problems_alone(
+    judge: MCPServer, judge_store: ReviewStore
+) -> None:
+    await call(judge, "log_review", platform="judge", problem_id="j0", rating="easy")
+
+    first = await call(judge, "import_solved", platform="judge", handle="ann")
+    second = await call(judge, "import_solved", platform="judge", handle="ann")
+
+    assert (first["imported"], first["already_tracked"]) == (2, 1)
+    assert (second["imported"], second["already_tracked"]) == (0, 3)
+    j0 = next(h for h in judge_store.histories() if h.problem_id == "j0")
+    assert [rating for rating, _ in j0.reviews] == [fsrs.Rating.Easy]
+
+
+async def test_import_solved_takes_the_most_recent_first(
+    judge: MCPServer, judge_store: ReviewStore
+) -> None:
+    result = await call(judge, "import_solved", platform="judge", handle="ann", limit=2)
+
+    assert (result["imported"], result["remaining"]) == (2, 1)
+    assert sorted(h.problem_id for h in judge_store.histories()) == ["j1", "j2"]
+
+
+async def test_import_solved_rates_good_where_rejections_are_hidden(
+    judge: MCPServer, judge_store: ReviewStore
+) -> None:
+    await call(judge, "link_account", platform="fake", handle="alice")
+
+    result = await call(judge, "import_solved", platform="fake")
+
+    assert (result["handle"], result["imported"]) == ("alice", 2)
+    ratings = {h.problem_id: h.reviews[0][0] for h in judge_store.histories()}
+    assert ratings == {"p0": fsrs.Rating.Good, "p1": fsrs.Rating.Good}
+
+
+async def test_import_solved_needs_a_known_handle(judge: MCPServer) -> None:
+    with pytest.raises(ToolError, match="none linked"):
+        await judge.call_tool("import_solved", {"platform": "judge"})
+    with pytest.raises(ToolError, match="not found"):
+        await judge.call_tool("import_solved", {"platform": "judge", "handle": "ghost"})
+
+
+async def test_import_solved_skips_a_problem_reviewed_while_it_ran(
+    judge_store: ReviewStore, clock: Clock
+) -> None:
+    adapter = JudgeAdapter()
+    server = create_server({"judge": adapter}, judge_store, now=clock, fuzz=False)
+    original = adapter.problem
+    reviewed = False
+
+    async def problem(problem_id: str) -> Problem:
+        # The user logs a review of j1 while the import is still loading tags.
+        nonlocal reviewed
+        if not reviewed:
+            reviewed = True
+            await call(server, "log_review", platform="judge", problem_id="j1", rating="easy")
+        return await original(problem_id)
+
+    adapter.problem = problem  # type: ignore[method-assign]
+    result = await call(server, "import_solved", platform="judge", handle="ann")
+
+    assert (result["imported"], result["already_tracked"]) == (2, 1)
+    j1 = next(h for h in judge_store.histories() if h.problem_id == "j1")
+    assert [rating for rating, _ in j1.reviews] == [fsrs.Rating.Easy]

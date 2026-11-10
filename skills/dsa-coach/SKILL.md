@@ -16,7 +16,11 @@ or platform the tools did not give you.
 1. Call `list_platforms` once to learn each platform's tags and levels.
 2. Call `get_profile` for every platform the user named whose `source` is `platform`.
    When the user tells you a username, save it with `link_account`; after that the
-   handle can be left out. A `reported` platform has no adapter, so neither
+   handle can be left out. Then offer `import_solved`: it tracks the problems they
+   already solved there, counting each first accept as a review, so revisions start
+   from their real history instead of an empty one. Say how many it imported and
+   how many are due now; if `remaining` is above zero, say how many older problems
+   are still untracked and offer to import them too. A `reported` platform has no adapter, so neither
    `get_profile` nor `search_problems` can read it: plan from its recorded reviews
    (`progress`, `mistake_patterns`) and tell the user it cannot be searched.
 3. Combine what you read with `mistake_patterns`: the topics they solve least and the
