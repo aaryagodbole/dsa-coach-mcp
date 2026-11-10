@@ -5,7 +5,8 @@ import { percent, recallColour } from "./format";
 export function DueList({ due, openLink }: { due: ReviewCard[]; openLink: OpenLink }) {
   return (
     <section>
-      <h2>Due now · chance you still remember it</h2>
+      <h2>Due now</h2>
+      <p className="sub">chance you still remember it</p>
       {due.length === 0 && <p className="empty">Nothing due. Nice.</p>}
       <div className="due">
         {due.map((card) => {

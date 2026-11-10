@@ -9,7 +9,8 @@ export function Calibration({ bins }: { bins: CalibrationBin[] }) {
   const total = bins.reduce((n, b) => n + b.reviews, 0);
   return (
     <section>
-      <h2>Calibration · predicted recall vs how often you recalled</h2>
+      <h2>Calibration</h2>
+      <p className="sub">predicted recall vs how often you recalled</p>
       {total === 0 ? (
         <p className="empty">Review a problem twice to see this.</p>
       ) : (
@@ -22,7 +23,7 @@ export function Calibration({ bins }: { bins: CalibrationBin[] }) {
             <line x1={scale(0)} y1={SIZE - scale(0)} x2={scale(0)} y2={SIZE - scale(1)} stroke="var(--line)" />
             {bins.map((b) => (
               <circle key={b.low} cx={scale(b.predicted)} cy={SIZE - scale(b.recalled)}
-                      r={3 + 7 * Math.sqrt(b.reviews / total)} fill="var(--accent)" fillOpacity={0.75}>
+                      r={3 + 7 * Math.sqrt(b.reviews / total)} fill="var(--accent)" fillOpacity={0.85} stroke="var(--ink)" strokeWidth={1.5}>
                 <title>{`${b.reviews} reviews: predicted ${percent(b.predicted)}, recalled ${percent(b.recalled)}`}</title>
               </circle>
             ))}

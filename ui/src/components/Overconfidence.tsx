@@ -5,7 +5,8 @@ import { day } from "./format";
 export function Overconfidence({ reviews, openLink }: { reviews: OverconfidentReview[]; openLink: OpenLink }) {
   return (
     <section>
-      <h2>Overconfidence · rated easy, then failed at the next review</h2>
+      <h2>Overconfidence</h2>
+      <p className="sub">rated easy, then failed at the next review</p>
       {reviews.length === 0 && <p className="empty">None so far.</p>}
       <div className="due">
         {reviews.map((r) => (

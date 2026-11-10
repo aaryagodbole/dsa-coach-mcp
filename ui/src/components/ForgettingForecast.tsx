@@ -4,7 +4,8 @@ import { percent, recallColour } from "./format";
 export function ForgettingForecast({ forecast, days }: { forecast: TopicForecast[]; days: number }) {
   return (
     <section>
-      <h2>Forgetting forecast · recall per tag now → in {days} days without revising</h2>
+      <h2>Forgetting forecast</h2>
+      <p className="sub">recall per tag now → in {days} days without revising</p>
       {forecast.length === 0 && <p className="empty">Review tagged problems to see this.</p>}
       <div className="due">
         {forecast.map((t) => (
