@@ -4,6 +4,7 @@ export function Platforms({ progress }: { progress: PlatformProgress[] }) {
   return (
     <section>
       <h2>Platforms</h2>
+      <p className="sub">problems, reviews and what is due on each judge</p>
       {progress.length === 0 && <p className="empty">No reviews yet.</p>}
       <div className="grid">
         {progress.map((p) => (

@@ -4,7 +4,8 @@ export function MistakeHeatmap({ patterns }: { patterns: MistakePatterns }) {
   if (patterns.kinds.length === 0) {
     return (
       <section>
-        <h2>Mistakes · by label and problem tag</h2>
+        <h2>Mistakes</h2>
+        <p className="sub">by label and problem tag</p>
         <p className="empty">No mistakes journaled yet.</p>
       </section>
     );
@@ -18,7 +19,8 @@ export function MistakeHeatmap({ patterns }: { patterns: MistakePatterns }) {
 
   return (
     <section>
-      <h2>Mistakes · by label and problem tag</h2>
+      <h2>Mistakes</h2>
+      <p className="sub">by label and problem tag</p>
       <div className="scroll">
         <table>
           <thead>

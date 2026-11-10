@@ -23,12 +23,16 @@ export function App() {
   });
   useHostStyles(app, app?.getHostContext());
 
-  if (error) return <p className="empty">Couldn't connect to the host: {error.message}</p>;
-  if (!data) return <p className="empty">Waiting for data…</p>;
+  if (error) return <p className="status empty">Couldn't connect to the host: {error.message}</p>;
+  if (!data) return <p className="status empty">Waiting for data…</p>;
   const openLink: OpenLink = (url) => app?.openLink({ url });
   const { insights } = data;
   return (
     <main>
+      <header className="brand">
+        <div className="logo">DSA COACH</div>
+        <span className="muted">{data.due.length} due now</span>
+      </header>
       <Platforms progress={data.progress} />
       <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />
       <DueList due={data.due} openLink={openLink} />

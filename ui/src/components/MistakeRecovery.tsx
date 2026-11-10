@@ -4,7 +4,8 @@ import { day } from "./format";
 export function MistakeRecovery({ recovery }: { recovery: Recovery[] }) {
   return (
     <section>
-      <h2>Mistake recovery · reviews of those problems since it last happened</h2>
+      <h2>Mistake recovery</h2>
+      <p className="sub">reviews of those problems since it last happened</p>
       {recovery.length === 0 && <p className="empty">No mistakes journaled yet.</p>}
       <div className="due">
         {recovery.map((m) => (

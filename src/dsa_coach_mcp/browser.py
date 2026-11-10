@@ -28,7 +28,7 @@ const view = document.getElementById("view");
 const result = __RESULT__;
 const theme = __THEME__ ??
   (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-document.body.style.background = theme === "dark" ? "#0d1117" : "#ffffff";
+document.body.style.background = theme === "dark" ? "#1a0d08" : "#f5e6d3";
 window.addEventListener("message", (e) => {
   if (e.source !== view.contentWindow) return;
   const m = e.data;

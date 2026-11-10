@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The dashboard has a new look: a cream, brown and terracotta theme with bold borders and
+  hard shadows, a header, and each panel titled with a short explanation underneath.
+
 ## [0.3.0] - 2026-11-10
 
 ### Added
