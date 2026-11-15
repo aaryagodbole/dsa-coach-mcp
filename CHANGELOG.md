@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `rename_mistake_kind`: fix a mistake label everywhere it was used, or merge two labels
+  that mean the same thing, so their counts add up.
+- Four practice prompts built on your own mistake journal: `hack_my_code` (tests aimed
+  at your past mistakes, run against your accepted solution), `teach_back` (explain the
+  bug to a junior who repeats your most common mistake), `pattern_drill` (name the
+  pattern on mixed topics with tags hidden) and `prep_path` (a day-by-day plan for the
+  days left before an interview or contest).
 - `import_solved`: start tracking the problems you already solved on a linked platform,
   most recent first. Each problem's first accepted submission counts as its first
   review (good on the first try, hard after rejected tries, good where the platform

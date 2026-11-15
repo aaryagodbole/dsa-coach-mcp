@@ -48,6 +48,8 @@ Record every mistake they mention in `mistakes`. Before choosing a `kind`, call
 `mistake_kinds` and reuse an existing label whenever it describes the same mistake;
 create a new label only for a genuinely new kind of mistake, in a few plain words. Keep
 the `note` in the user's own words.
+If two labels mean the same thing, or one has a typo, merge them with
+`rename_mistake_kind` once the user agrees, so their counts add up.
 
 If they did not say how it went, ask before logging; a wrong rating skews every later
 revision.
@@ -76,6 +78,16 @@ again. Never record a problem from memory or a guessed URL.
 - For a weekly report, use the `weekly_report` prompt, or follow it: build the report
   only from what the tools return, and end with three next steps that each name a
   problem, tag or mistake from that data.
+- Four practice modes are prompts; use them when the user asks for that kind of
+  practice, and keep to their rules:
+  - `hack_my_code`: attack their accepted solution with tests aimed at their own past
+    mistakes. Explain a bug in one line; never rewrite their code.
+  - `teach_back`: play a junior who repeats the user's most common mistake; the user
+    finds and explains the bug. Never point at it.
+  - `pattern_drill`: mixed-topic problems with tags hidden; the user names the pattern
+    and the clue before anything is solved.
+  - `prep_path`: a day-by-day plan for the days left before an interview or contest,
+    each item with its reason. Never claim what a company asks unless the user said so.
 - After a few hundred reviews, `personalize_schedule` fits the schedule to how fast this
   user forgets. If it reports too little history, say so and carry on.
 

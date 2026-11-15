@@ -105,6 +105,7 @@ async def test_exposes_the_coaching_tools(server: MCPServer) -> None:
         "link_account",
         "unlink_account",
         "import_solved",
+        "rename_mistake_kind",
         "search_problems",
         "log_review",
         "review_evidence",
@@ -128,9 +129,9 @@ async def test_every_tool_declares_all_four_behavior_hints(server: MCPServer) ->
         assert hints is not None, tool.name
         for hint in ("read_only_hint", "destructive_hint", "idempotent_hint", "open_world_hint"):
             assert isinstance(getattr(hints, hint), bool), (tool.name, hint)
-        # Only the account tools overwrite or delete data, and just the saved username;
-        # reads are also safe to repeat.
-        if tool.name in {"link_account", "unlink_account"}:
+        # Only the account tools and relabelling overwrite data: the saved username, or
+        # a mistake's label. Reads are also safe to repeat.
+        if tool.name in {"link_account", "unlink_account", "rename_mistake_kind"}:
             assert hints.destructive_hint is True, tool.name
             assert hints.idempotent_hint is True, tool.name
         else:
@@ -906,3 +907,53 @@ async def test_import_solved_skips_a_problem_reviewed_while_it_ran(
     assert (result["imported"], result["already_tracked"]) == (2, 1)
     j1 = next(h for h in judge_store.histories() if h.problem_id == "j1")
     assert [rating for rating, _ in j1.reviews] == [fsrs.Rating.Easy]
+
+
+async def test_rename_mistake_kind_fixes_a_label_and_merges_into_an_existing_one(
+    server: MCPServer,
+) -> None:
+    for problem_id, kind in (("p0", "of by one"), ("p1", "of by one"), ("p2", "off by one")):
+        await call(
+            server,
+            "log_review",
+            platform="fake",
+            problem_id=problem_id,
+            rating="hard",
+            mistakes=[{"kind": kind, "note": "n"}],
+        )
+
+    message = await call(server, "rename_mistake_kind", old="of by one", new="off by one")
+    again = await call(server, "rename_mistake_kind", old="off by one", new="off by one")
+
+    assert message["result"] == (
+        "Relabelled 2 mistakes from 'of by one' to 'off by one' and merged them with the "
+        "ones already there."
+    )
+    assert again["result"] == "'off by one' is already the label."
+    kinds = (await call(server, "mistake_kinds"))["result"]
+    assert [(k["kind"], k["count"]) for k in kinds] == [("off by one", 3)]
+
+
+async def test_rename_mistake_kind_rejects_an_unknown_label(server: MCPServer) -> None:
+    await call(server, "log_review", **REVIEW, mistakes=[{"kind": "k", "note": "n"}])
+
+    with pytest.raises(ToolError, match=r"No mistake is labelled 'x'. Labels: \['k'\]"):
+        await server.call_tool("rename_mistake_kind", {"old": "x", "new": "y"})
+
+
+@pytest.mark.parametrize(
+    ("prompt", "arguments", "expected"),
+    [
+        ("hack_my_code", {"problem": "Two Sum"}, "accepted solution for Two Sum"),
+        ("teach_back", {"problem": "Two Sum"}, "Use Two Sum."),
+        ("teach_back", {}, "Pick a problem from revisions_due"),
+        ("pattern_drill", {"count": "8"}, "drill of 8 problems"),
+        ("prep_path", {"days": "21", "goal": "a Google interview"}, "21 days left for a Google"),
+    ],
+)
+async def test_practice_prompts_use_their_arguments(
+    server: MCPServer, prompt: str, arguments: dict[str, str], expected: str
+) -> None:
+    text = (await server.get_prompt(prompt, arguments)).messages[0].content.text
+
+    assert expected in text

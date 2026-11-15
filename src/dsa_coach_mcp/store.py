@@ -491,6 +491,13 @@ class ReviewStore:
             for r in rows
         ]
 
+    def rename_mistake_kind(self, old: str, new: str) -> int:
+        """Relabel every mistake of one kind, merging it into ``new`` if that label is
+        already used. Returns how many mistakes changed."""
+
+        with self._connect() as conn:
+            return conn.execute("UPDATE mistakes SET kind = ? WHERE kind = ?", (new, old)).rowcount
+
     def mistakes(
         self,
         *,

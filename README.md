@@ -83,6 +83,7 @@ flowchart LR
 | `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
 | `show_dashboard` | Progress, revisions due by risk of forgetting, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
+| `rename_mistake_kind` | Fixes a mistake label everywhere it was used, or merges two labels that mean the same thing |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
 | `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |
 
@@ -93,6 +94,10 @@ flowchart LR
 | `practice_plan` | Builds the next practice set from your recurring mistakes and progress |
 | `revision_quiz` | Quizzes you on today's revisions using what you got wrong before |
 | `weekly_report` | Reports on your last week: what you did, what's slipping, mistakes that keep coming back, and three things to do next |
+| `hack_my_code` | Paste an accepted solution; it is attacked with tests aimed at your own past mistakes, then the usual edge cases |
+| `teach_back` | You teach a confused junior whose wrong code repeats your most common mistake: find the bug and explain it |
+| `pattern_drill` | Mixed-topic problems with the tags hidden: name the pattern and the clue before solving |
+| `prep_path` | A day-by-day plan for the days left before an interview or contest, from your weak topics, due revisions and repeated mistakes |
 
 ### Dashboard
 

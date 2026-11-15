@@ -217,3 +217,13 @@ def test_tracked_lists_one_platforms_problem_ids(tmp_path: Path) -> None:
 
     assert store.tracked("leetcode") == {"a", "b"}
     assert store.tracked("codeforces") == set()
+
+
+def test_rename_mistake_kind_relabels_only_that_kind(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+    mistakes = [Mistake(kind="a", note="1"), Mistake(kind="b", note="2")]
+    store.record_review(problem("x"), due_in(1), Rating.Hard, AT, mistakes)
+
+    assert store.rename_mistake_kind("a", "b") == 1
+    assert store.rename_mistake_kind("a", "b") == 0
+    assert [(k.kind, k.count) for k in store.mistake_kinds()] == [("b", 2)]
