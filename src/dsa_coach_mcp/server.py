@@ -100,6 +100,9 @@ _RELABEL = ToolAnnotations(
 _IMPORT = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
 )
+# Revisions the dashboard lists for today. After an import many fall due at once; a
+# short list a day, most at risk first, is one the user can actually finish.
+TODAY_REVISIONS = 5
 # Problem pages read at once while importing, to fill in tags the profile leaves out.
 IMPORT_CONCURRENCY = 4
 
@@ -658,16 +661,15 @@ def create_server(
 
     @server.tool(annotations=_READ_REMOTE, meta={"ui": {"resourceUri": DASHBOARD_URI}})
     async def show_dashboard(
-        limit: Annotated[int, Field(ge=1, le=100)] = 15,
+        limit: Annotated[int, Field(ge=1, le=100)] = TODAY_REVISIONS,
         days: Annotated[int | None, Field(ge=1)] = None,
     ) -> Dashboard:
-        """Show the user's progress per platform, the revisions due now ordered by how
-        likely they are to be forgotten, a heatmap of mistakes by label and tag, and what
-        the history says about their memory: recall per tag now and two weeks out, which
-        mistakes stopped recurring, problems rated easy then failed, and how well FSRS's
-        predictions matched, plus live stats for each account linked with link_account,
-        how many problems per tag the user would still get right today, and their own
-        checklist of past mistakes per tag.
+        """Show the user's progress per platform, today's revisions (the ``limit`` most likely to be
+        forgotten, with how many more are due), a heatmap of mistakes by label and tag, and what the
+        history says about their memory: recall per tag now and two weeks out, which mistakes
+        stopped recurring, problems rated easy then failed, and how well FSRS's predictions matched,
+        plus live stats for each account linked with link_account, how many problems per tag the
+        user would still get right today, and their own checklist of past mistakes per tag.
         Hosts that support MCP Apps render it as an interactive dashboard."""
 
         at = now()
@@ -694,6 +696,7 @@ def create_server(
                 for platform, problems, reviews, due_now in rows
             ],
             due=due,
+            due_total=len(records),
             patterns=await asyncio.to_thread(store.patterns, lookback(days)),
             insights=await asyncio.to_thread(
                 build_insights,

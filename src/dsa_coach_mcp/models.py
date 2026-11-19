@@ -269,7 +269,10 @@ class NextStep(BaseModel):
 
 class Dashboard(BaseModel):
     progress: list[PlatformProgress]
+    # Today's revisions: the ones most at risk, at most the day's limit.
     due: list[ReviewCard]
+    # Every revision due now, so the view can say how many wait beyond today's.
+    due_total: int = 0
     patterns: MistakePatterns
     insights: Insights
     # Live stats for each platform the user linked with link_account.

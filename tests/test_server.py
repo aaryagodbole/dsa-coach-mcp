@@ -957,3 +957,22 @@ async def test_practice_prompts_use_their_arguments(
     text = (await server.get_prompt(prompt, arguments)).messages[0].content.text
 
     assert expected in text
+
+
+async def test_dashboard_lists_todays_revisions_and_counts_the_rest(
+    judge: MCPServer, clock: Clock
+) -> None:
+    # Six problems imported from December are all due by January.
+    adapter_problems = [f"p{i}" for i in range(4)]
+    for problem_id in adapter_problems:
+        await call(judge, "log_review", platform="fake", problem_id=problem_id, rating="good")
+    await call(judge, "import_solved", platform="judge", handle="ann")
+    clock.at += timedelta(days=60)
+
+    dashboard = await call(judge, "show_dashboard")
+    wider = await call(judge, "show_dashboard", limit=10)
+
+    assert (len(dashboard["due"]), dashboard["due_total"]) == (5, 7)
+    assert (len(wider["due"]), wider["due_total"]) == (7, 7)
+    recall = [c["retrievability"] for c in dashboard["due"]]
+    assert recall == sorted(recall)

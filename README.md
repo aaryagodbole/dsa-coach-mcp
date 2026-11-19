@@ -81,7 +81,7 @@ flowchart LR
 | `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
 | `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |
 | `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
-| `show_dashboard` | Progress, revisions due by risk of forgetting, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
+| `show_dashboard` | Today's five revisions most at risk of forgetting (and how many more are due), progress, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
 | `rename_mistake_kind` | Fixes a mistake label everywhere it was used, or merges two labels that mean the same thing |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
@@ -111,7 +111,7 @@ never revised. **Before you submit** turns your mistake journal into a checklist
 topic, most frequent mistake first, with your own note on each. It then
 shows **live stats for each account you linked** (solved per level or
 your rating, your strongest tags, tags you tried and never solved, and tags you've barely
-practised), progress per platform, the revisions due now, and what your own
+practised), progress per platform, today's revisions (the five you are most likely to forget, with a count of the rest), and what your own
 history says about your memory: a **forgetting forecast** (recall per tag now and in two
 weeks if you revise nothing), **mistake recovery** (reviews since each mistake last
 happened), **overconfidence** (problems rated easy and failed at the next review) and

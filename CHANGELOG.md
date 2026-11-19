@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The dashboard opens on **Today**: the five revisions you are most likely to forget,
+  with how many more are due, instead of every overdue problem at once. After an import
+  the rest come up on later days. `show_dashboard`'s `limit` sets how many.
 - `rename_mistake_kind`: fix a mistake label everywhere it was used, or merge two labels
   that mean the same thing, so their counts add up.
 - Four practice prompts built on your own mistake journal: `hack_my_code` (tests aimed

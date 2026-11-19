@@ -44,6 +44,7 @@ async def test_dashboard_page_wraps_the_live_show_dashboard_result(tmp_path: Pat
     assert set(result["structuredContent"]) == {
         "progress",
         "due",
+        "due_total",
         "patterns",
         "insights",
         "accounts",
