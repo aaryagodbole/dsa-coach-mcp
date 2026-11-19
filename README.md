@@ -72,6 +72,7 @@ flowchart LR
 | `list_platforms` | Connected platforms, with the tags and levels each accepts as filters |
 | `get_profile` | Your level, solved and unsolved counts per tag, and recent submissions |
 | `link_account` / `unlink_account` | Saves (or forgets) your username on a platform, so tools default to it and the dashboard shows that account |
+| `import_solved` | Starts tracking the problems you already solved on a platform, most recent first, with each first accepted submission as its first review (good on the first try, hard after rejected tries), so you don't log them one by one. Problems already tracked are left alone |
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
 | `log_review` | Records how you did (`again` / `hard` / `good` / `easy`), journals the mistakes behind it, and schedules the next revision with FSRS. Title, link and tags come from the platform |
 | `review_evidence` | Suggests a `log_review` rating from your actual submissions since the last review: `again` if none was accepted, `good` on a first-try accept, `hard` after rejected tries. Never `easy`, and nothing where a platform hides rejected submissions |
@@ -80,8 +81,9 @@ flowchart LR
 | `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
 | `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |
 | `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
-| `show_dashboard` | Progress, revisions due by risk of forgetting, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
+| `show_dashboard` | Today's five revisions most at risk of forgetting (and how many more are due), progress, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
 | `mistake_kinds` | Every mistake label used so far, so new mistakes reuse the same words |
+| `rename_mistake_kind` | Fixes a mistake label everywhere it was used, or merges two labels that mean the same thing |
 | `list_mistakes` | Journaled mistakes, filterable by label, tag, platform or recent days |
 | `mistake_patterns` | Mistake counts per label, broken down by tag, platform and month |
 
@@ -92,6 +94,10 @@ flowchart LR
 | `practice_plan` | Builds the next practice set from your recurring mistakes and progress |
 | `revision_quiz` | Quizzes you on today's revisions using what you got wrong before |
 | `weekly_report` | Reports on your last week: what you did, what's slipping, mistakes that keep coming back, and three things to do next |
+| `hack_my_code` | Paste an accepted solution; it is attacked with tests aimed at your own past mistakes, then the usual edge cases |
+| `teach_back` | You teach a confused junior whose wrong code repeats your most common mistake: find the bug and explain it |
+| `pattern_drill` | Mixed-topic problems with the tags hidden: name the pattern and the clue before solving |
+| `prep_path` | A day-by-day plan for the days left before an interview or contest, from your weak topics, due revisions and repeated mistakes |
 
 ### Dashboard
 
@@ -105,7 +111,7 @@ never revised. **Before you submit** turns your mistake journal into a checklist
 topic, most frequent mistake first, with your own note on each. It then
 shows **live stats for each account you linked** (solved per level or
 your rating, your strongest tags, tags you tried and never solved, and tags you've barely
-practised), progress per platform, the revisions due now, and what your own
+practised), progress per platform, today's revisions (the five you are most likely to forget, with a count of the rest), and what your own
 history says about your memory: a **forgetting forecast** (recall per tag now and in two
 weeks if you revise nothing), **mistake recovery** (reviews since each mistake last
 happened), **overconfidence** (problems rated easy and failed at the next review) and

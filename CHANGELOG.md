@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The dashboard opens on **Today**: the five revisions you are most likely to forget,
+  with how many more are due, instead of every overdue problem at once. After an import
+  the rest come up on later days. `show_dashboard`'s `limit` sets how many.
+- `rename_mistake_kind`: fix a mistake label everywhere it was used, or merge two labels
+  that mean the same thing, so their counts add up.
+- Four practice prompts built on your own mistake journal: `hack_my_code` (tests aimed
+  at your past mistakes, run against your accepted solution), `teach_back` (explain the
+  bug to a junior who repeats your most common mistake), `pattern_drill` (name the
+  pattern on mixed topics with tags hidden) and `prep_path` (a day-by-day plan for the
+  days left before an interview or contest).
+- `import_solved`: start tracking the problems you already solved on a linked platform,
+  most recent first. Each problem's first accepted submission counts as its first
+  review (good on the first try, hard after rejected tries, good where the platform
+  hides rejections), so revisions are scheduled from your real history without logging
+  each problem. Tags missing from the profile are read from the problem page, and
+  problems already tracked are left alone.
 - A [live demo](https://aaryagodbole.github.io/dsa-coach-mcp/) of the dashboard with made-up sample data, published to GitHub
   Pages from `examples/dashboard_host.py --demo` on every change to main.
 - **What you still know** on the dashboard: per topic, problems solved on your linked

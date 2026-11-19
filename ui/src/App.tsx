@@ -46,19 +46,25 @@ export function App() {
     <main>
       <header className="brand">
         <div className="logo">DSA COACH</div>
-        <span className="muted">{data.due.length} due now</span>
+        <span className="muted">{todayLabel(data.due.length, data.due_total ?? data.due.length)}</span>
       </header>
       <Coach steps={data.next_steps ?? []} openLink={openLink} send={send} />
+      <DueList due={data.due} total={data.due_total ?? data.due.length} openLink={openLink} />
       <SkillMap skills={data.skills ?? { tags: [], unreviewed: [] }} />
       <Accounts accounts={data.accounts ?? []} />
       <Checklists checklists={data.checklists ?? []} />
       <Platforms progress={data.progress} />
       <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />
-      <DueList due={data.due} openLink={openLink} />
       <MistakeRecovery recovery={insights.recovery} />
       <Overconfidence reviews={insights.overconfidence} openLink={openLink} />
       <MistakeHeatmap patterns={data.patterns} />
       <Calibration bins={insights.calibration} />
     </main>
   );
+}
+
+function todayLabel(today: number, total: number): string {
+  if (total === 0) return "nothing due today";
+  const more = total - today;
+  return more > 0 ? `${today} to revise today · ${more} more due` : `${today} to revise today`;
 }

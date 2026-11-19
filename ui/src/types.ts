@@ -42,6 +42,7 @@ export interface MistakePatterns {
 export interface Dashboard {
   progress: PlatformProgress[];
   due: ReviewCard[];
+  due_total?: number;
   patterns: MistakePatterns;
   insights: Insights;
   accounts: AccountStats[];
