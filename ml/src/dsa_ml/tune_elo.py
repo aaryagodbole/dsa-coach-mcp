@@ -32,6 +32,7 @@ GRID = {
     "k_topic": (0.1, 0.3),
     "user_rating_scale": (0.0, 0.1, 0.2),
 }
+OWN_PAST_TEST_SHARE = 0.2
 
 
 def user_ratings(df: pd.DataFrame) -> np.ndarray:
@@ -110,6 +111,22 @@ def main() -> None:
             "recalibrated": scores(y[n_fit:], calibrated),
         }
         print(held_out, json.dumps(results[held_out]), flush=True)
+
+    # Each judge trained on its own past: pick the setting by log-loss on the judge's
+    # older 80% of attempts, score the newest 20%. Elo is online, so every prediction
+    # still uses earlier attempts only. This is the only way to tune user_rating_scale,
+    # since only Codeforces has user ratings.
+    for name, d in data.items():
+        y = d["y"]
+        cut = int(len(y) * (1 - OWN_PAST_TEST_SHARE))
+        best = min(
+            range(len(settings)), key=lambda i: scores(y[:cut], predictions[i][name][:cut])["log_loss"]
+        )
+        results[f"{name}, own past"] = {
+            "settings": {k: v for k, v in asdict(settings[best]).items() if k in GRID},
+            "newest 20%": scores(y[cut:], predictions[best][name][cut:]),
+        }
+        print(f"{name}, own past", json.dumps(results[f"{name}, own past"]), flush=True)
 
     shipped = min(range(len(settings)), key=lambda i: np.mean(list(losses[i].values())))
     results["shipped settings"] = asdict(settings[shipped])
