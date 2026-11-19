@@ -1009,3 +1009,19 @@ async def test_link_account_explains_a_link_or_handle_it_cannot_use(
 ) -> None:
     with pytest.raises(ToolError, match=error):
         await server.call_tool("link_account", arguments)
+
+
+async def test_revisions_are_ranked_by_the_recall_model(server: MCPServer, clock: Clock) -> None:
+    for problem_id, rating in (("p0", "good"), ("p1", "hard"), ("p2", "easy")):
+        await call(server, "log_review", platform="fake", problem_id=problem_id, rating=rating)
+    clock.at += timedelta(days=60)
+
+    due = (await call(server, "revisions_due"))["result"]
+    dashboard = await call(server, "show_dashboard")
+
+    chances = [card["recall"] for card in due]
+    assert all(c is not None and 0 < c < 1 for c in chances)
+    assert chances == sorted(chances)
+    assert [c["problem_id"] for c in dashboard["due"]] == [c["problem_id"] for c in due]
+    (revise,) = [s for s in dashboard["next_steps"] if s["kind"] == "revise"]
+    assert revise["detail"].startswith(f"{round(chances[0] * 100)}% chance")

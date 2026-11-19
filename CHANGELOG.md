@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A trained recall model ranks revisions. Gradient-boosted trees, trained on 7M
+  reviews from 300 Anki users and shipped as plain arrays (46 KB, no ML library needed),
+  estimate the chance you still remember each problem from its review history and its
+  FSRS state. On users it never saw it ranks recall better than FSRS tuned to each
+  user's own history (AUC 0.849 against 0.840; 0.824 against 0.798 on problems reviewed
+  at most twice). `revisions_due`, the dashboard's Today list and the coach use it, with
+  FSRS's estimate where it does not apply (a problem reviewed earlier the same day).
+  Training and evaluation are in [`ml/`](ml/README.md).
 - The dashboard is split into three tabs: **Today** (next steps, today's revisions and
   the before-you-submit checklist), **Skills** (what you still know, your platforms and
   revision progress) and **Insights** (forecast, recovery, overconfidence, mistakes and

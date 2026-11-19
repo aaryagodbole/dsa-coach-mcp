@@ -21,7 +21,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field
 
-from . import coach, evidence, scheduling, skills
+from . import coach, evidence, recall, scheduling, skills
 from .insights import insights as build_insights
 from .models import (
     AccountStats,
@@ -185,6 +185,22 @@ def create_server(
             retrievability=fsrs.get_card_retrievability(card, at) if reviewed else None,
             reviews=record.reviews,
         )
+
+    async def due_cards(at: datetime, fsrs: scheduling.Scheduler) -> list[ReviewCard]:
+        """Every card due now, the one least likely to be recalled first, by the recall
+        model where it applies and FSRS otherwise; never-reviewed cards come first."""
+
+        records, histories = await asyncio.gather(
+            asyncio.to_thread(store.due, at), asyncio.to_thread(store.histories)
+        )
+        cards = [to_card(record, at, fsrs) for record in records]
+        by_key = {(h.platform, h.problem_id): h.reviews for h in histories}
+        chances = await asyncio.to_thread(
+            recall.recall, by_key, at, [(c.platform, c.problem_id) for c in cards]
+        )
+        for card in cards:
+            card.recall = chances.get((card.platform, card.problem_id))
+        return sorted(cards, key=lambda c: (c.chance is not None, c.chance))
 
     def adapter_for_host(host: str) -> PlatformAdapter | None:
         return next((a for a in adapters.values() if host in a.hosts), None)
@@ -537,11 +553,7 @@ def create_server(
         first."""
 
         at = now()
-        fsrs = await scheduler()
-        records = await asyncio.to_thread(store.due, at)
-        cards = [to_card(record, at, fsrs) for record in records]
-        ranked = sorted(cards, key=lambda c: (c.retrievability is not None, c.retrievability))
-        return ranked[:limit]
+        return (await due_cards(at, await scheduler()))[:limit]
 
     @server.tool(annotations=_WRITE_LOCAL)
     async def record_problem(
@@ -715,11 +727,8 @@ def create_server(
         accounts = asyncio.gather(*(linked_stats(p, h) for p, h in linked))
         rows = await asyncio.to_thread(store.progress, at)
         fsrs = await scheduler()
-        records = await asyncio.to_thread(store.due, at)
-        due = sorted(
-            (to_card(record, at, fsrs) for record in records),
-            key=lambda c: (c.retrievability is not None, c.retrievability),
-        )[:limit]
+        all_due = await due_cards(at, fsrs)
+        due = all_due[:limit]
         dashboard = Dashboard(
             progress=[
                 PlatformProgress(
@@ -732,7 +741,7 @@ def create_server(
                 for platform, problems, reviews, due_now in rows
             ],
             due=due,
-            due_total=len(records),
+            due_total=len(all_due),
             patterns=await asyncio.to_thread(store.patterns, lookback(days)),
             insights=await asyncio.to_thread(
                 build_insights,
