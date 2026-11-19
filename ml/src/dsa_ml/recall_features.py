@@ -28,16 +28,32 @@ MAX_REVIEWS_PER_USER = 60_000
 PRIOR = 10.0
 
 
-def user_events(user_id: int) -> pd.DataFrame:
+def load_revlog(user_id: int) -> pd.DataFrame:
     df = pd.read_parquet(REVLOGS / f"user_id={user_id}" / "data.parquet")
-    df = df.head(MAX_REVIEWS_PER_USER)
-    scheduler = Scheduler(learning_steps=(), relearning_steps=(), enable_fuzzing=False)
+    return df.head(MAX_REVIEWS_PER_USER).reset_index(drop=True)
+
+
+def make_scheduler(parameters: tuple[float, ...] | None = None) -> Scheduler:
+    if parameters is None:
+        return Scheduler(learning_steps=(), relearning_steps=(), enable_fuzzing=False)
+    return Scheduler(
+        parameters=parameters, learning_steps=(), relearning_steps=(), enable_fuzzing=False
+    )
+
+
+def user_events(user_id: int, parameters: tuple[float, ...] | None = None) -> pd.DataFrame:
+    """Review events for one user, with FSRS replayed using ``parameters`` (default
+    FSRS when None). Column ``row`` is the review's position in the user's log."""
+
+    df = load_revlog(user_id)
+    scheduler = make_scheduler(parameters)
     cards: dict[int, Card] = {}
     history: dict[int, list[float]] = {}
     rows = []
     user_seen = user_hits = 0
     base = 0.85  # prior for a user's recall rate before their first counted review
-    for card_id, day, rating, duration, elapsed in zip(
+    for row, card_id, day, rating, duration, elapsed in zip(
+        range(len(df)),
         df["card_id"].to_numpy(),
         df["day_offset"].to_numpy(),
         df["rating"].to_numpy(),
@@ -57,6 +73,7 @@ def user_events(user_id: int) -> pd.DataFrame:
             rows.append(
                 (
                     user_id,
+                    row,
                     y,
                     math.log1p(elapsed),
                     n,
@@ -94,6 +111,7 @@ def user_events(user_id: int) -> pd.DataFrame:
 
 COLUMNS = [
     "user",
+    "row",
     "y",
     "log_elapsed",
     "n_reviews",

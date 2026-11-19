@@ -33,6 +33,10 @@ FEATURES = [
     "user_days_active",
     "user_gap_days",
     "user_recent_rate",
+    "pub_pct",
+    "user_level_pct",
+    "pct_gap",
+    "elo_logit",
 ]
 
 
