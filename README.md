@@ -76,7 +76,7 @@ flowchart LR
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
 | `log_review` | Records how you did (`again` / `hard` / `good` / `easy`), journals the mistakes behind it, and schedules the next revision with FSRS. Title, link and tags come from the platform |
 | `review_evidence` | Suggests a `log_review` rating from your actual submissions since the last review: `again` if none was accepted, `good` on a first-try accept, `hard` after rejected tries. Never `easy`, and nothing where a platform hides rejected submissions |
-| `revisions_due` | Problems due now, the one you are least likely to remember first, each with FSRS's recall estimate |
+| `revisions_due` | Problems due now, the one you are least likely to remember first, by a trained recall model (and FSRS's own estimate) |
 | `schedule_info` | The FSRS parameters in use, whether they are personalised, and how many reviews are logged |
 | `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
 | `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |

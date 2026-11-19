@@ -66,7 +66,16 @@ class ReviewCard(BaseModel):
     difficulty: float | None = None
     # FSRS's estimate of the chance the user recalls it right now.
     retrievability: float | None = None
+    # The recall model's estimate of the same chance (see recall.py); None where it does
+    # not apply, such as a problem reviewed earlier today.
+    recall: float | None = None
     reviews: int = 0
+
+    @property
+    def chance(self) -> float | None:
+        """The best estimate available: the recall model's, else FSRS's."""
+
+        return self.recall if self.recall is not None else self.retrievability
 
 
 class PlatformProgress(BaseModel):

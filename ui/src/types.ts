@@ -17,6 +17,8 @@ export interface ReviewCard {
   stability: number | null;
   difficulty: number | null;
   retrievability: number | null;
+  // The recall model's chance; null where it does not apply (then use retrievability).
+  recall?: number | null;
   reviews: number;
 }
 

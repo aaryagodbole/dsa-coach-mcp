@@ -16,13 +16,13 @@ def _percent(value: float) -> str:
 
 
 def _revise(due: list[ReviewCard]) -> NextStep | None:
-    reviewed = [c for c in due if c.retrievability is not None]
+    reviewed = [c for c in due if c.chance is not None]
     if reviewed:
-        card = min(reviewed, key=lambda c: c.retrievability or 0.0)
+        card = min(reviewed, key=lambda c: c.chance or 0.0)
         return NextStep(
             kind="revise",
             title=f"Revise {card.title}",
-            detail=f"{_percent(card.retrievability or 0.0)} chance you still remember it.",
+            detail=f"{_percent(card.chance or 0.0)} chance you still remember it.",
             url=card.url,
         )
     if due:
