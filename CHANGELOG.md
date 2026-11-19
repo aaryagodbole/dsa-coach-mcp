@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The dashboard is split into three tabs: **Today** (next steps, today's revisions and
+  the before-you-submit checklist), **Skills** (what you still know, your platforms and
+  revision progress) and **Insights** (forecast, recovery, overconfidence, mistakes and
+  calibration), instead of eleven panels on one long page. The tab bar works with arrow
+  keys, and the last tab is remembered where the host allows storage.
 - Paste a profile link instead of a username: `link_account` reads the platform and
   username from links such as `https://leetcode.com/u/NAME/` or
   `https://codeforces.com/profile/NAME`. The dashboard's **My platforms** panel has a
