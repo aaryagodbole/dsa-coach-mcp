@@ -1,0 +1,27 @@
+[project]
+name = "dsa-ml"
+version = "0.1.0"
+description = "Training and evaluation for dsa-coach-mcp's solve-probability and recall models"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "scikit-learn>=1.5",
+    "lightgbm>=4.5",
+    "huggingface-hub>=2.4.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dsa_ml"]
+
+[tool.ruff]
+line-length = 100
