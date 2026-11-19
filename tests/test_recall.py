@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fsrs import Rating
 
-from dsa_coach_mcp import recall
+from recall_coach import recall
 
 DAY0 = datetime(2026, 1, 1, 9, tzinfo=UTC)
 

@@ -1,24 +1,28 @@
-# dsa-coach-mcp
+# recall-coach
 
-<!-- mcp-name: io.github.aaryagodbole/dsa-coach-mcp -->
+<!-- mcp-name: io.github.aaryagodbole/recall-coach -->
 
-[![CI](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/dsa-coach-mcp.svg)](https://pypi.org/project/dsa-coach-mcp/)
+[![CI](https://github.com/aaryagodbole/recall-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/aaryagodbole/recall-coach/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/recall-coach.svg)](https://pypi.org/project/recall-coach/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/LICENSE)
-[![Live demo](https://img.shields.io/badge/demo-dashboard-c1502e.svg)](https://aaryagodbole.github.io/dsa-coach-mcp/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/aaryagodbole/recall-coach/blob/main/LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-dashboard-c1502e.svg)](https://aaryagodbole.github.io/recall-coach/)
 
-An [MCP](https://modelcontextprotocol.io) server that turns your DSA practice on any
-judge into a coach inside Claude, Cursor or any MCP client: revise what you solved on a
+*Formerly `dsa-coach-mcp`: existing installs, configs and history keep working (see [Configuration](#configuration)).*
+
+A DSA practice coach for any judge: an [MCP](https://modelcontextprotocol.io) server for
+Claude, Cursor or any MCP client, a dashboard, and models trained on public data that
+predict what you are about to forget and what you can solve next. It turns your practice
+into a coach: revise what you solved on a
 spaced-repetition schedule, with a **mistake journal** that remembers *why* you got
 things wrong and builds your next practice set around it. On **LeetCode** and
 **Codeforces** it also reads your history live, shows where you stand and finds
 problems to try next; problems from any other judge are recorded as you solve them.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/demo.svg" alt="dsa-coach-mcp driven over stdio on live LeetCode and Codeforces data" width="820">
+  <img src="https://raw.githubusercontent.com/aaryagodbole/recall-coach/main/docs/demo.svg" alt="recall-coach driven over stdio on live LeetCode and Codeforces data" width="820">
 </p>
-<p align="center"><sub>A real session, recorded by <a href="https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/examples/demo.py"><code>examples/demo.py</code></a>: it starts the server over stdio and calls its tools on live data.</sub></p>
+<p align="center"><sub>A real session, recorded by <a href="https://github.com/aaryagodbole/recall-coach/blob/main/examples/demo.py"><code>examples/demo.py</code></a>: it starts the server over stdio and calls its tools on live data.</sub></p>
 
 ## Why
 
@@ -78,7 +82,7 @@ flowchart LR
 | `review_evidence` | Suggests a `log_review` rating from your actual submissions since the last review: `again` if none was accepted, `good` on a first-try accept, `hard` after rejected tries. Never `easy`, and nothing where a platform hides rejected submissions |
 | `revisions_due` | Problems due now, the one you are least likely to remember first, by a trained recall model (and FSRS's own estimate) |
 | `schedule_info` | The FSRS parameters in use, whether they are personalised, and how many reviews are logged |
-| `personalize_schedule` | Fits FSRS to your own review history (needs `dsa-coach-mcp[optimizer]`) |
+| `personalize_schedule` | Fits FSRS to your own review history (needs `recall-coach[optimizer]`) |
 | `record_problem` | Records a problem from any other platform (HackerRank, GeeksforGeeks, CodeChef, AtCoder, ...) as read from its page |
 | `progress` | Per platform: problems reviewed, reviews logged, and problems due now |
 | `show_dashboard` | Today's five revisions most at risk of forgetting (and how many more are due), progress, a mistake heatmap, a forgetting forecast, mistake recovery, overconfidence and calibration, as an interactive view in hosts that support [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) |
@@ -124,7 +128,7 @@ In a client that can't render MCP Apps, such as Claude Code, open it in your bro
 instead, from the same local history:
 
 ```bash
-uvx dsa-coach-mcp dashboard
+uvx recall-coach dashboard
 ```
 
 It serves the page on localhost only and stops with Ctrl+C.
@@ -132,10 +136,10 @@ The view is a React app built into one self-contained HTML file with no external
 light or dark theme, and talks to the host over the MCP Apps postMessage protocol.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/dashboard-dark.png" alt="dsa-coach dashboard, dark theme" width="49%">
-  <img src="https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/docs/dashboard-light.png" alt="dsa-coach dashboard, light theme" width="49%">
+  <img src="https://raw.githubusercontent.com/aaryagodbole/recall-coach/main/docs/dashboard-dark.png" alt="recall-coach dashboard, dark theme" width="49%">
+  <img src="https://raw.githubusercontent.com/aaryagodbole/recall-coach/main/docs/dashboard-light.png" alt="recall-coach dashboard, light theme" width="49%">
 </p>
-<p align="center"><sub>Rendered from sample data by <a href="https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol. <a href="https://aaryagodbole.github.io/dsa-coach-mcp/">Try the live demo</a>.</sub></p>
+<p align="center"><sub>Rendered from sample data by <a href="https://github.com/aaryagodbole/recall-coach/blob/main/examples/dashboard_host.py"><code>examples/dashboard_host.py</code></a>, which plays the host's side of the protocol. <a href="https://aaryagodbole.github.io/recall-coach/">Try the live demo</a>.</sub></p>
 
 ### Any platform
 
@@ -149,7 +153,7 @@ from then on it is reviewed, scheduled and journaled like any other problem.
 ```json
 {
   "mcpServers": {
-    "dsa-coach": { "command": "uvx", "args": ["dsa-coach-mcp"] },
+    "recall-coach": { "command": "uvx", "args": ["recall-coach"] },
     "playwright": { "command": "npx", "args": ["@playwright/mcp@latest", "--extension"] }
   }
 }
@@ -184,9 +188,9 @@ Requires [uv](https://docs.astral.sh/uv/).
 ```json
 {
   "mcpServers": {
-    "dsa-coach": {
+    "recall-coach": {
       "command": "uvx",
-      "args": ["dsa-coach-mcp"]
+      "args": ["recall-coach"]
     }
   }
 }
@@ -195,32 +199,32 @@ Requires [uv](https://docs.astral.sh/uv/).
 **Claude Code**:
 
 ```bash
-claude mcp add dsa-coach -- uvx dsa-coach-mcp
+claude mcp add recall-coach -- uvx recall-coach
 ```
 
 **Cursor**: same `command` and `args` as above in `.cursor/mcp.json`.
 
 ### Agent skill
 
-[`skills/dsa-coach/SKILL.md`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/skills/dsa-coach/SKILL.md) tells the agent when to reach
+[`skills/recall-coach/SKILL.md`](https://github.com/aaryagodbole/recall-coach/blob/main/skills/recall-coach/SKILL.md) tells the agent when to reach
 for these tools and how to use them well: how to rate a review, to reuse existing
 mistake labels, and to record problems from other platforms only from a page it read.
 For Claude Code, copy it into your skills:
 
 ```bash
-mkdir -p ~/.claude/skills/dsa-coach
-curl -fsSL https://raw.githubusercontent.com/aaryagodbole/dsa-coach-mcp/main/skills/dsa-coach/SKILL.md \
-  -o ~/.claude/skills/dsa-coach/SKILL.md
+mkdir -p ~/.claude/skills/recall-coach
+curl -fsSL https://raw.githubusercontent.com/aaryagodbole/recall-coach/main/skills/recall-coach/SKILL.md \
+  -o ~/.claude/skills/recall-coach/SKILL.md
 ```
 
 ### Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DSA_COACH_DB` | `~/.dsa-coach/coach.db` | Where cards, reviews and mistakes are stored |
+| `RECALL_COACH_DB` | `~/.recall-coach/coach.db` | Where cards, reviews and mistakes are stored. An existing `~/.dsa-coach/coach.db` (or `DSA_COACH_DB`) from before the rename keeps being used |
 
 To personalise the schedule, install the optimizer extra (it pulls in PyTorch):
-`uvx --from 'dsa-coach-mcp[optimizer]' dsa-coach-mcp`.
+`uvx --from 'recall-coach[optimizer]' recall-coach`.
 
 ## Privacy
 
@@ -229,18 +233,18 @@ handles you give it, and revision cards stay in a local SQLite file.
 
 ## Adding a platform
 
-1. Write `src/dsa_coach_mcp/platforms/<name>.py` with a class implementing
-   [`PlatformAdapter`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/src/dsa_coach_mcp/platforms/base.py): `name`, `describe()`,
+1. Write `src/recall_coach/platforms/<name>.py` with a class implementing
+   [`PlatformAdapter`](https://github.com/aaryagodbole/recall-coach/blob/main/src/recall_coach/platforms/base.py): `name`, `describe()`,
    `profile()` and `search()`.
 2. Add the class to `ADAPTERS` in
-   [`platforms/__init__.py`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/src/dsa_coach_mcp/platforms/__init__.py).
-3. Add tests with a mocked API, like [`tests/test_codeforces.py`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/tests/test_codeforces.py).
+   [`platforms/__init__.py`](https://github.com/aaryagodbole/recall-coach/blob/main/src/recall_coach/platforms/__init__.py).
+3. Add tests with a mocked API, like [`tests/test_codeforces.py`](https://github.com/aaryagodbole/recall-coach/blob/main/tests/test_codeforces.py).
 
 The server and tools need no changes.
 
 ## Evals
 
-Unit tests check the code; [`evals/`](https://github.com/aaryagodbole/dsa-coach-mcp/tree/main/evals/) checks whether a model can actually
+Unit tests check the code; [`evals/`](https://github.com/aaryagodbole/recall-coach/tree/main/evals/) checks whether a model can actually
 coach with these tools. A model drives the real server over the MCP protocol, against a
 fixture world (one practice platform, a seeded history, a fixed clock), on tasks such
 as planning from a profile, logging a review with its mistakes, reusing an existing
@@ -261,7 +265,7 @@ EVALS_BASE_URL=<api base url> EVALS_MODEL=<model> EVALS_API_KEY=<key, if needed>
 ```
 
 The loop talks to models through a small `AgentBackend` interface
-([`evals/backends/base.py`](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/evals/backends/base.py)); an API with a different wire
+([`evals/backends/base.py`](https://github.com/aaryagodbole/recall-coach/blob/main/evals/backends/base.py)); an API with a different wire
 format is one more backend module. Runs never start on their own: run it locally, or
 start the **Agent evals** workflow from the Actions tab after setting the
 `EVALS_BASE_URL` and `EVALS_MODEL` repository variables (and an `EVALS_API_KEY` secret
@@ -278,7 +282,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy
 ```
 
-The dashboard is a React + TypeScript app in [`ui/`](https://github.com/aaryagodbole/dsa-coach-mcp/tree/main/ui/),
+The dashboard is a React + TypeScript app in [`ui/`](https://github.com/aaryagodbole/recall-coach/tree/main/ui/),
 built with Vite into the single HTML file the package serves. After changing it, rebuild
 and commit the output; CI checks they match:
 
@@ -293,8 +297,8 @@ uv run python examples/demo.py --leetcode <username> --codeforces <handle>
 ```
 
 Tests never hit the network: adapters are tested against mocked API responses. See
-[CONTRIBUTING.md](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/aaryagodbole/recall-coach/blob/main/CONTRIBUTING.md).
 
 ## License
 
-[MIT](https://github.com/aaryagodbole/dsa-coach-mcp/blob/main/LICENSE)
+[MIT](https://github.com/aaryagodbole/recall-coach/blob/main/LICENSE)

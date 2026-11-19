@@ -3,8 +3,8 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from dsa_coach_mcp import platforms
-from dsa_coach_mcp.platforms import PlatformAdapter, build_adapters
+from recall_coach import platforms
+from recall_coach.platforms import PlatformAdapter, build_adapters
 
 
 async def test_every_adapter_is_keyed_by_its_own_name() -> None:

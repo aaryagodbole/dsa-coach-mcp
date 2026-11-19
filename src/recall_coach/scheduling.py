@@ -60,7 +60,7 @@ def optimize(logs: Sequence[ReviewLog]) -> list[float]:
     except ImportError as exc:  # torch and friends are optional
         raise RuntimeError(
             "Personalising the schedule needs the optimizer extra: "
-            "pip install 'dsa-coach-mcp[optimizer]'"
+            "pip install 'recall-coach[optimizer]'"
         ) from exc
     return list(Optimizer(list(logs)).compute_optimal_parameters())
 

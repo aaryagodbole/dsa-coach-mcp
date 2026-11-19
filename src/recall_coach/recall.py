@@ -36,7 +36,7 @@ Review = tuple[Rating, datetime]
 
 @cache
 def _model() -> dict[str, Any]:
-    with gzip.open(files("dsa_coach_mcp.trained").joinpath("recall.json.gz").open("rb"), "rt") as f:
+    with gzip.open(files("recall_coach.trained").joinpath("recall.json.gz").open("rb"), "rt") as f:
         model: dict[str, Any] = json.load(f)
     return model
 

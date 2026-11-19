@@ -12,9 +12,9 @@ from .platforms import build_adapters
 from .server import create_server
 from .store import ReviewStore, default_db_path
 
-__version__ = version("dsa-coach-mcp")
+__version__ = version("recall-coach")
 
-_USER_AGENT = f"dsa-coach-mcp/{__version__} (+https://github.com/aaryagodbole/dsa-coach-mcp)"
+_USER_AGENT = f"recall-coach/{__version__} (+https://github.com/aaryagodbole/recall-coach)"
 
 
 async def _serve() -> None:
@@ -37,7 +37,7 @@ async def _dashboard_page() -> str:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        prog="dsa-coach-mcp",
+        prog="recall-coach",
         description="DSA coach MCP server. With no command, serves MCP over stdio.",
     )
     commands = parser.add_subparsers(dest="command")

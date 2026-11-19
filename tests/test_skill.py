@@ -10,7 +10,7 @@ from mcp import Client
 
 from evals.fixture import build_server
 
-SKILL = Path(__file__).parents[1] / "skills" / "dsa-coach" / "SKILL.md"
+SKILL = Path(__file__).parents[1] / "skills" / "recall-coach" / "SKILL.md"
 
 
 def test_frontmatter_is_valid() -> None:
@@ -18,7 +18,7 @@ def test_frontmatter_is_valid() -> None:
     assert text.startswith("---\n")
     front = yaml.safe_load(text.split("---\n")[1])
 
-    assert front["name"] == "dsa-coach"
+    assert front["name"] == "recall-coach"
     # Claude Code truncates description + when_to_use at 1,536 characters.
     assert 0 < len(front["description"]) <= 1536
 

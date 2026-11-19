@@ -1,16 +1,16 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.aaryagodbole/dsa-coach-mcp",
+  "name": "io.github.aaryagodbole/recall-coach",
   "description": "DSA coach for LeetCode, Codeforces and more: spaced-repetition revision and a mistake journal.",
   "repository": {
-    "url": "https://github.com/aaryagodbole/dsa-coach-mcp",
+    "url": "https://github.com/aaryagodbole/recall-coach",
     "source": "github"
   },
   "version": "0.3.0",
   "packages": [
     {
       "registryType": "pypi",
-      "identifier": "dsa-coach-mcp",
+      "identifier": "recall-coach",
       "version": "0.3.0",
       "transport": {
         "type": "stdio"

@@ -4,23 +4,23 @@ import { ExternalLink, type OpenLink } from "./ExternalLink";
 
 export type SendMessage = (text: string) => Promise<boolean>;
 
-// Short requests the assistant turns into a report, plan or quiz with dsa-coach's tools.
+// Short requests the assistant turns into a report, plan or quiz with recall-coach's tools.
 const ASKS = [
   {
     label: "Weekly report",
     text:
-      "Using dsa-coach, give me my weekly DSA report: what I did this week, what is " +
+      "Using recall-coach, give me my weekly DSA report: what I did this week, what is " +
       "slipping, which mistakes keep coming back, and three things to do next.",
   },
   {
     label: "Plan my session",
     text:
-      "Using dsa-coach, plan my next practice session from my recurring mistakes and " +
+      "Using recall-coach, plan my next practice session from my recurring mistakes and " +
       "weakest topics, with problems that target them.",
   },
   {
     label: "Quiz me",
-    text: "Using dsa-coach, quiz me on my due revisions, one question at a time.",
+    text: "Using recall-coach, quiz me on my due revisions, one question at a time.",
   },
 ];
 

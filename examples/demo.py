@@ -1,4 +1,4 @@
-"""Drive dsa-coach-mcp the way an MCP client does and record the session as an SVG.
+"""Drive recall-coach the way an MCP client does and record the session as an SVG.
 
 Launches the real server over stdio against a throwaway database, calls its tools on
 live LeetCode and Codeforces data, and saves the transcript to docs/demo.svg:
@@ -39,7 +39,7 @@ async def call(client: Client, tool: str, **arguments: Any) -> Any:
 async def run(leetcode: str, codeforces: str, db: Path) -> None:
     server = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "dsa_coach_mcp"],
+        args=["-m", "recall_coach"],
         env={**os.environ, "DSA_COACH_DB": str(db)},
     )
     async with Client(server) as client:
@@ -47,7 +47,7 @@ async def run(leetcode: str, codeforces: str, db: Path) -> None:
         prompts = await client.list_prompts()
         console.print(
             Panel.fit(
-                f"[bold]dsa-coach-mcp[/] · {len(tools.tools)} tools · "
+                f"[bold]recall-coach[/] · {len(tools.tools)} tools · "
                 f"{len(prompts.prompts)} prompts · connected over stdio",
                 border_style="green",
             )
@@ -158,7 +158,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         asyncio.run(run(args.leetcode, args.codeforces, Path(tmp) / "coach.db"))
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    console.save_svg(str(args.out), title="dsa-coach-mcp", theme=MONOKAI)
+    console.save_svg(str(args.out), title="recall-coach", theme=MONOKAI)
     print(f"saved {args.out}", file=sys.stderr)
 
 

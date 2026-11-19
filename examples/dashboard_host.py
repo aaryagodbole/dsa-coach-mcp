@@ -22,11 +22,11 @@ from typing import Any
 
 from mcp import Client
 
-from dsa_coach_mcp.browser import host_page
-from dsa_coach_mcp.models import PlatformInfo, Problem, Profile
-from dsa_coach_mcp.platforms import ProblemNotFoundError
-from dsa_coach_mcp.server import DASHBOARD_URI, create_server
-from dsa_coach_mcp.store import ReviewStore
+from recall_coach.browser import host_page
+from recall_coach.models import PlatformInfo, Problem, Profile
+from recall_coach.platforms import ProblemNotFoundError
+from recall_coach.server import DASHBOARD_URI, create_server
+from recall_coach.store import ReviewStore
 
 # Sample history so every panel has something to draw. The problems are generic
 # exercises on a placeholder judge, not problems from a real one.
@@ -163,8 +163,8 @@ DEMO_NOTE = (
     '<p style="margin:0;padding:8px 16px;font:600 13px/1.4 system-ui,sans-serif;'
     'text-align:center;background:#2c1810;color:#f5e6d3">'
     "Live demo with made-up sample data. Get your own: "
-    '<a style="color:#f08a5d" href="https://github.com/aaryagodbole/dsa-coach-mcp">'
-    "github.com/aaryagodbole/dsa-coach-mcp</a></p>"
+    '<a style="color:#f08a5d" href="https://github.com/aaryagodbole/recall-coach">'
+    "github.com/aaryagodbole/recall-coach</a></p>"
 )
 
 

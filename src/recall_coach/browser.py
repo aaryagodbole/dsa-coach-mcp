@@ -36,7 +36,7 @@ window.addEventListener("message", (e) => {
   const reply = (body) => view.contentWindow.postMessage({jsonrpc: "2.0", ...body}, "*");
   if (m.method === "ui/initialize") {
     reply({id: m.id, result: {
-      protocolVersion: "2026-01-26", hostInfo: {name: "dsa-coach-mcp", version: "1"},
+      protocolVersion: "2026-01-26", hostInfo: {name: "recall-coach", version: "1"},
       hostCapabilities: {openLinks: {}}, hostContext: {theme}}});
   } else if (m.method === "ui/open-link") {
     const ok = /^https?:\\/\\//.test(m.params?.url ?? "");

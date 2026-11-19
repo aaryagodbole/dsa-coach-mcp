@@ -12,10 +12,10 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult
 
-from dsa_coach_mcp.models import PlatformInfo, Problem, Profile, Submission
-from dsa_coach_mcp.platforms import ProblemNotFoundError, UserNotFoundError
-from dsa_coach_mcp.server import create_server
-from dsa_coach_mcp.store import ReviewStore
+from recall_coach.models import PlatformInfo, Problem, Profile, Submission
+from recall_coach.platforms import ProblemNotFoundError, UserNotFoundError
+from recall_coach.server import create_server
+from recall_coach.store import ReviewStore
 
 NOW = datetime(2026, 1, 1, 9, tzinfo=UTC)
 
@@ -244,7 +244,7 @@ async def test_personalising_without_the_optimizer_says_how_to_get_it(
     monkeypatch.setitem(sys.modules, "fsrs.optimizer", None)
     monkeypatch.delitem(vars(fsrs), "Optimizer", raising=False)
 
-    with pytest.raises(ToolError, match=r"dsa-coach-mcp\[optimizer\]"):
+    with pytest.raises(ToolError, match=r"recall-coach\[optimizer\]"):
         await server.call_tool("personalize_schedule", {})
 
 
@@ -354,7 +354,7 @@ async def test_an_unfitted_result_is_not_saved_as_personal(
 ) -> None:
     from fsrs.scheduler import DEFAULT_PARAMETERS
 
-    from dsa_coach_mcp import scheduling
+    from recall_coach import scheduling
 
     monkeypatch.setattr(scheduling, "optimize", lambda logs: list(DEFAULT_PARAMETERS))
     await call(server, "log_review", platform="fake", problem_id="p0", rating="good")
@@ -536,7 +536,7 @@ async def test_one_platform_down_leaves_the_others_listed(tmp_path: Path) -> Non
 async def test_dashboard_is_an_mcp_app_linked_from_its_tool(server: MCPServer) -> None:
     from mcp import Client
 
-    from dsa_coach_mcp.server import DASHBOARD_URI, MCP_APP_MIME_TYPE
+    from recall_coach.server import DASHBOARD_URI, MCP_APP_MIME_TYPE
 
     async with Client(server) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
@@ -645,7 +645,7 @@ async def test_unlink_account_forgets_the_handle(server: MCPServer) -> None:
 async def test_dashboard_shows_each_linked_account_and_survives_a_broken_one(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from dsa_coach_mcp import server as server_module
+    from recall_coach import server as server_module
 
     class Broken(FakeAdapter):
         name = "broken"
@@ -706,7 +706,7 @@ async def test_dashboard_reports_an_unreachable_platform(tmp_path: Path) -> None
 
 
 def test_account_stats_lists_strong_struggling_and_barely_touched_tags() -> None:
-    from dsa_coach_mcp.server import account_stats
+    from recall_coach.server import account_stats
 
     solved = {f"t{i}": 10 - i for i in range(8)} | {"zero": 0}
     stats = account_stats(

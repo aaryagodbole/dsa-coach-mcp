@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - src/dsa_coach_mcp/**
+      - src/recall_coach/**
       - examples/dashboard_host.py
       - .github/workflows/pages.yml
   workflow_dispatch:

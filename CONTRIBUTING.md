@@ -5,8 +5,8 @@ Thanks for helping out. Bug reports, platform adapters and fixes are all welcome
 ## Setup
 
 ```bash
-git clone https://github.com/aaryagodbole/dsa-coach-mcp
-cd dsa-coach-mcp
+git clone https://github.com/aaryagodbole/recall-coach
+cd recall-coach
 uv sync
 uv run pre-commit install
 ```
@@ -37,7 +37,7 @@ Releases publish to PyPI through [trusted publishing](https://docs.pypi.org/trus
 so no API token is stored anywhere.
 
 1. Once per project, before the first release: the PyPI owner adds a trusted publisher
-   for `dsa-coach-mcp` (repository `aaryagodbole/dsa-coach-mcp`, workflow `release.yml`,
+   for `recall-coach` (repository `aaryagodbole/recall-coach`, workflow `release.yml`,
    environment `pypi`) at pypi.org → Publishing. The `pypi` GitHub environment only
    accepts `v*` tags.
 2. Bump `version` in `pyproject.toml` and `server.json`, and move the `Unreleased` changelog entries under a
