@@ -6,6 +6,8 @@ is useful without a model."""
 from __future__ import annotations
 
 import asyncio
+import re
+from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
@@ -24,6 +26,7 @@ from .insights import insights as build_insights
 from .models import (
     AccountStats,
     Dashboard,
+    ImportResult,
     Mistake,
     MistakeEntry,
     MistakeKind,
@@ -36,6 +39,7 @@ from .models import (
     ReviewCard,
     ReviewEvidence,
     ScheduleInfo,
+    Submission,
     TagCount,
 )
 from .platforms import PlatformAdapter, PlatformError
@@ -48,6 +52,7 @@ Call list_platforms first to learn each platform's tags and levels, get_profile 
 where the user stands, and search_problems with filters you chose from that data.
 When the user tells you their username on a platform, save it with link_account; tools
 that take a handle then default to it, and the dashboard shows that account's stats.
+Then offer import_solved, which schedules revisions for what they already solved there.
 After the user solves or revisits a problem, record how well they recalled it with
 log_review (again, hard, good or easy). On a platform with an adapter, call
 review_evidence with their handle first: it reads the rating from their submissions,
@@ -87,6 +92,23 @@ _LINK_ACCOUNT = ToolAnnotations(
 _UNLINK_ACCOUNT = ToolAnnotations(
     read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
 )
+# Relabelling rewrites the kind on past mistakes; a second call finds none left to change.
+_RELABEL = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
+)
+# Importing reads the platform and adds cards, but never touches one already tracked, so a
+# second call adds nothing new.
+_IMPORT = ToolAnnotations(
+    read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
+)
+# A username in a profile link: leetcode.com/u/NAME, leetcode.com/NAME,
+# codeforces.com/profile/NAME and the like.
+_PROFILE_PATH = re.compile(r"^/(?:u/|profile/|users?/)?([^/]+)/?$")
+# Revisions the dashboard lists for today. After an import many fall due at once; a
+# short list a day, most at risk first, is one the user can actually finish.
+TODAY_REVISIONS = 5
+# Problem pages read at once while importing, to fill in tags the profile leaves out.
+IMPORT_CONCURRENCY = 4
 
 
 def account_stats(profile: Profile) -> AccountStats:
@@ -290,12 +312,44 @@ def create_server(
             profile.rejections_public,
         )
 
-    @server.tool(annotations=_LINK_ACCOUNT)
-    async def link_account(platform: str, handle: NonBlank) -> AccountStats:
-        """Save the user's username on a platform, replacing any saved before, after
-        checking it exists. Tools that take a handle default to it, and show_dashboard
-        shows this account's stats. Returns those stats."""
+    def from_profile_url(text: str) -> tuple[str, str] | None:
+        """The platform and username in a pasted profile link, or None for a bare
+        username."""
 
+        if "/" not in text:
+            return None
+        parts = urlsplit(text if "://" in text else f"https://{text}")
+        host = (parts.hostname or "").removeprefix("www.")
+        adapter = adapter_for_host(host)
+        if adapter is None:
+            known = sorted(h for a in adapters.values() for h in a.hosts)
+            raise ToolError(f"{host or text} is not a platform with an adapter. Known: {known}")
+        match = _PROFILE_PATH.match(parts.path)
+        if match is None:
+            raise ToolError(
+                f"{text} is not a profile link. Paste the page that shows the username, "
+                "such as https://leetcode.com/u/NAME/ or https://codeforces.com/profile/NAME"
+            )
+        return adapter.name, match.group(1)
+
+    @server.tool(annotations=_LINK_ACCOUNT)
+    async def link_account(handle: NonBlank, platform: str | None = None) -> AccountStats:
+        """Save the user's username on a platform, replacing any saved before, after
+        checking it exists. ``handle`` is the username, or a link to the user's profile
+        page as they pasted it (the platform is then read from the link). Tools that take
+        a handle default to it, and show_dashboard shows this account's stats. Returns
+        those stats."""
+
+        parsed = from_profile_url(handle.strip())
+        if parsed is not None:
+            linked_on, handle = parsed
+            if platform is not None and platform != linked_on:
+                raise ToolError(f"That link is a {linked_on} profile, not {platform}.")
+            platform = linked_on
+        if platform is None:
+            raise ToolError(
+                f"Which platform is '{handle}' on? Pass platform, or paste the profile link."
+            )
         adapter = adapter_for(platform)
         async with _platform_errors(platform):
             profile = await adapter.profile(handle)
@@ -310,6 +364,89 @@ def create_server(
         if await asyncio.to_thread(store.unlink_account, platform):
             return f"Unlinked {platform}."
         return f"No account was linked on {platform}."
+
+    @server.tool(annotations=_IMPORT)
+    async def import_solved(
+        platform: str,
+        handle: str | None = None,
+        limit: Annotated[int, Field(ge=1, le=500)] = 100,
+    ) -> ImportResult:
+        """Start tracking the problems the user already solved on a platform, most recent
+        first, so revisions are scheduled without logging each one. Each problem's first
+        accepted submission counts as its first review: good if accepted on the first
+        try, hard after rejected tries, and good where the platform hides rejections.
+        Problems already tracked are left alone, so calling it again only adds new ones.
+        Without a handle, uses the one linked with link_account."""
+
+        adapter = adapter_for(platform)
+        handle = await handle_for(platform, handle)
+        async with _platform_errors(platform):
+            profile = await adapter.profile(handle)
+
+        attempts: dict[str, list[Submission]] = defaultdict(list)
+        first_accepted: dict[str, Submission] = {}
+        for sub in sorted(profile.submissions, key=lambda s: s.submitted_at):
+            attempts[sub.problem.problem_id].append(sub)
+            if sub.accepted:
+                first_accepted.setdefault(sub.problem.problem_id, sub)
+        tracked = await asyncio.to_thread(store.tracked, platform)
+        new = sorted(
+            (s for pid, s in first_accepted.items() if pid not in tracked),
+            key=lambda s: s.submitted_at,
+            reverse=True,
+        )
+        chosen, remaining = new[:limit], len(new) - min(len(new), limit)
+
+        gate = asyncio.Semaphore(IMPORT_CONCURRENCY)
+
+        async def with_tags(problem: Problem) -> Problem:
+            # Some profiles list problems without tags; the problem page has them. A page
+            # that fails to load still leaves the problem worth tracking.
+            if problem.tags:
+                return problem
+            async with gate:
+                try:
+                    return await adapter.problem(problem.problem_id)
+                except (PlatformError, httpx.HTTPError):
+                    return problem
+
+        problems = await asyncio.gather(*(with_tags(s.problem) for s in chosen))
+        imported = 0
+        async with review_lock:
+            # Read again: a review logged while the tags loaded must not be overwritten.
+            tracked = await asyncio.to_thread(store.tracked, platform)
+            fsrs = await scheduler()
+            for sub, problem in zip(chosen, problems, strict=True):
+                if sub.problem.problem_id in tracked:
+                    continue
+                found = evidence.review_evidence(
+                    platform,
+                    sub.problem.problem_id,
+                    attempts[sub.problem.problem_id],
+                    since=None,
+                    rejections_public=profile.rejections_public,
+                )
+                rating = ReviewRating(found.suggested_rating or "good")
+                card, _ = scheduling.review(fsrs, scheduling.Card(), rating, sub.submitted_at)
+                await asyncio.to_thread(
+                    store.record_review,
+                    problem,
+                    card,
+                    scheduling.to_rating(rating),
+                    sub.submitted_at,
+                    [],
+                )
+                imported += 1
+            due = await asyncio.to_thread(store.due, now())
+        return ImportResult(
+            platform=platform,
+            handle=profile.handle,
+            imported=imported,
+            already_tracked=len(first_accepted) - len(new) + len(chosen) - imported,
+            remaining=remaining,
+            due_now=len(due),
+            limitations=profile.limitations,
+        )
 
     @server.tool(annotations=_READ_REMOTE)
     async def search_problems(
@@ -495,6 +632,23 @@ def create_server(
 
         return await asyncio.to_thread(store.mistake_kinds)
 
+    @server.tool(annotations=_RELABEL)
+    async def rename_mistake_kind(old: NonBlank, new: NonBlank) -> str:
+        """Correct a mistake label on every mistake that has it: fix a typo, or merge two
+        labels that mean the same thing, so they are counted together. If ``new`` is
+        already a label, the two are merged."""
+
+        old, new = old.strip(), new.strip()
+        if old == new:
+            return f"'{old}' is already the label."
+        known = {k.kind for k in await asyncio.to_thread(store.mistake_kinds)}
+        if old not in known:
+            raise ToolError(f"No mistake is labelled '{old}'. Labels: {sorted(known)}")
+        changed = await asyncio.to_thread(store.rename_mistake_kind, old, new)
+        merged = " and merged them with the ones already there" if new in known else ""
+        plural = "" if changed == 1 else "s"
+        return f"Relabelled {changed} mistake{plural} from '{old}' to '{new}'{merged}."
+
     @server.tool(annotations=_READ_LOCAL)
     async def list_mistakes(
         kind: str | None = None,
@@ -543,16 +697,15 @@ def create_server(
 
     @server.tool(annotations=_READ_REMOTE, meta={"ui": {"resourceUri": DASHBOARD_URI}})
     async def show_dashboard(
-        limit: Annotated[int, Field(ge=1, le=100)] = 15,
+        limit: Annotated[int, Field(ge=1, le=100)] = TODAY_REVISIONS,
         days: Annotated[int | None, Field(ge=1)] = None,
     ) -> Dashboard:
-        """Show the user's progress per platform, the revisions due now ordered by how
-        likely they are to be forgotten, a heatmap of mistakes by label and tag, and what
-        the history says about their memory: recall per tag now and two weeks out, which
-        mistakes stopped recurring, problems rated easy then failed, and how well FSRS's
-        predictions matched, plus live stats for each account linked with link_account,
-        how many problems per tag the user would still get right today, and their own
-        checklist of past mistakes per tag.
+        """Show the user's progress per platform, today's revisions (the ``limit`` most likely to be
+        forgotten, with how many more are due), a heatmap of mistakes by label and tag, and what the
+        history says about their memory: recall per tag now and two weeks out, which mistakes
+        stopped recurring, problems rated easy then failed, and how well FSRS's predictions matched,
+        plus live stats for each account linked with link_account, how many problems per tag the
+        user would still get right today, and their own checklist of past mistakes per tag.
         Hosts that support MCP Apps render it as an interactive dashboard."""
 
         at = now()
@@ -579,6 +732,7 @@ def create_server(
                 for platform, problems, reviews, due_now in rows
             ],
             due=due,
+            due_total=len(records),
             patterns=await asyncio.to_thread(store.patterns, lookback(days)),
             insights=await asyncio.to_thread(
                 build_insights,
@@ -637,6 +791,79 @@ def create_server(
             "rate my recall as again, hard, good or easy, then record it with log_review, "
             "including any "
             "new mistake."
+        )
+
+    @server.prompt()
+    def hack_my_code(problem: str = "") -> str:
+        """Attack the user's accepted solution with tests aimed at their own past
+        mistakes."""
+
+        which = f" for {problem}" if problem else ""
+        return (
+            f"I will paste my accepted solution{which}. Try to break it. First call "
+            "mistake_kinds and list_mistakes (with the problem's tag, and with its "
+            "platform and problem_id if I have reviewed it) to learn the mistakes I keep "
+            "making. Then write up to eight test inputs, each aimed at one weakness: my "
+            "past mistakes first, then the usual edge cases (empty input, one element, "
+            "duplicates, extremes of the constraints, overflow, worst-case size). For each "
+            "test give the input, the expected output and which mistake it targets. If "
+            "you can run code, run my solution on them and mark each survived or broke, "
+            "with the actual output. If one breaks, explain the bug in one line without "
+            "rewriting my code, and ask whether to record it as a mistake with log_review."
+        )
+
+    @server.prompt()
+    def teach_back(problem: str = "") -> str:
+        """The user teaches a confused junior who repeats one of the user's own past
+        mistakes."""
+
+        which = (
+            f"Use {problem}."
+            if problem
+            else "Pick a problem from revisions_due, or one from list_mistakes."
+        )
+        return (
+            f"Let me teach a confused junior. {which} Call mistake_patterns to find the "
+            "mistake I repeat most, and play a junior who solved the problem with exactly "
+            "that mistake: show their short, plausible, wrong code and say they don't "
+            "understand why it fails. Do not point at the bug. I have to find it, explain "
+            "why it is wrong and how to fix it, as I would to a real junior. Ask the "
+            "follow-up questions a junior would ask when my explanation is vague. At the "
+            "end, say which of my past mistakes it was, and rate how clearly I explained "
+            "it. If the problem is one I track, offer to record a review with log_review."
+        )
+
+    @server.prompt()
+    def pattern_drill(count: str = "5") -> str:
+        """Name-the-pattern drill on mixed topics, before solving anything."""
+
+        return (
+            f"Run a pattern drill of {count} problems. Call show_dashboard and use its "
+            "skill map to pick my weakest topics, then search_problems across several "
+            "of them (with exclude_solved_by set to my linked handle) and shuffle the "
+            "topics so consecutive problems need different patterns. For each problem, "
+            "show only its title, statement summary and constraints, never its tags. Ask "
+            "me which pattern solves it and which clue in the statement gave it away. "
+            "Then reveal the tags, say whether I was right and what the real clue was. "
+            "End with my score and the patterns I mixed up."
+        )
+
+    @server.prompt()
+    def prep_path(days: str = "14", goal: str = "") -> str:
+        """A day-by-day plan for the days left before an interview or contest."""
+
+        aim = f" for {goal}" if goal else ""
+        return (
+            f"I have {days} days left{aim}. Build me a day-by-day plan from my own data. "
+            "Call show_dashboard for my weak topics, forgetting forecast and linked "
+            "accounts; revisions_due for what to revise; and mistake_patterns for the "
+            "mistakes I repeat. Spread the due revisions over the first days, most at "
+            "risk first. Give the most days to topics that are weak or slipping, using "
+            "search_problems with exclude_solved_by set to my linked handle, and include "
+            "problems that make me face my repeated mistakes. Keep each day to about an "
+            "hour, and leave the last day for light revision only. For every item, say "
+            "why it is there, from that data. Do not claim what a company asks unless I "
+            "told you."
         )
 
     return server

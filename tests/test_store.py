@@ -208,3 +208,22 @@ def test_mistakes_by_tag_counts_each_kind_and_keeps_the_latest_note(tmp_path: Pa
 
     assert rows[("graph", "missed cycle")] == (2, later.date(), "new note")
     assert rows[("bfs", "missed cycle")] == (1, AT.date(), "old note")
+
+
+def test_tracked_lists_one_platforms_problem_ids(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+    store.record_review(problem("a"), due_in(1), Rating.Good, AT, [])
+    store.record_review(problem("b"), due_in(1), Rating.Good, AT, [])
+
+    assert store.tracked("leetcode") == {"a", "b"}
+    assert store.tracked("codeforces") == set()
+
+
+def test_rename_mistake_kind_relabels_only_that_kind(tmp_path: Path) -> None:
+    store = ReviewStore(tmp_path / "coach.db")
+    mistakes = [Mistake(kind="a", note="1"), Mistake(kind="b", note="2")]
+    store.record_review(problem("x"), due_in(1), Rating.Hard, AT, mistakes)
+
+    assert store.rename_mistake_kind("a", "b") == 1
+    assert store.rename_mistake_kind("a", "b") == 0
+    assert [(k.kind, k.count) for k in store.mistake_kinds()] == [("b", 2)]

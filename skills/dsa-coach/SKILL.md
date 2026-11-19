@@ -15,8 +15,13 @@ or platform the tools did not give you.
 
 1. Call `list_platforms` once to learn each platform's tags and levels.
 2. Call `get_profile` for every platform the user named whose `source` is `platform`.
-   When the user tells you a username, save it with `link_account`; after that the
-   handle can be left out. A `reported` platform has no adapter, so neither
+   When the user tells you a username or pastes a profile link, save it with
+   `link_account` (pass the link as `handle`); after that the
+   handle can be left out. Then offer `import_solved`: it tracks the problems they
+   already solved there, counting each first accept as a review, so revisions start
+   from their real history instead of an empty one. Say how many it imported and
+   how many are due now; if `remaining` is above zero, say how many older problems
+   are still untracked and offer to import them too. A `reported` platform has no adapter, so neither
    `get_profile` nor `search_problems` can read it: plan from its recorded reviews
    (`progress`, `mistake_patterns`) and tell the user it cannot be searched.
 3. Combine what you read with `mistake_patterns`: the topics they solve least and the
@@ -44,6 +49,8 @@ Record every mistake they mention in `mistakes`. Before choosing a `kind`, call
 `mistake_kinds` and reuse an existing label whenever it describes the same mistake;
 create a new label only for a genuinely new kind of mistake, in a few plain words. Keep
 the `note` in the user's own words.
+If two labels mean the same thing, or one has a typo, merge them with
+`rename_mistake_kind` once the user agrees, so their counts add up.
 
 If they did not say how it went, ask before logging; a wrong rating skews every later
 revision.
@@ -72,6 +79,16 @@ again. Never record a problem from memory or a guessed URL.
 - For a weekly report, use the `weekly_report` prompt, or follow it: build the report
   only from what the tools return, and end with three next steps that each name a
   problem, tag or mistake from that data.
+- Four practice modes are prompts; use them when the user asks for that kind of
+  practice, and keep to their rules:
+  - `hack_my_code`: attack their accepted solution with tests aimed at their own past
+    mistakes. Explain a bug in one line; never rewrite their code.
+  - `teach_back`: play a junior who repeats the user's most common mistake; the user
+    finds and explains the bug. Never point at it.
+  - `pattern_drill`: mixed-topic problems with tags hidden; the user names the pattern
+    and the clue before anything is solved.
+  - `prep_path`: a day-by-day plan for the days left before an interview or contest,
+    each item with its reason. Never claim what a company asks unless the user said so.
 - After a few hundred reviews, `personalize_schedule` fits the schedule to how fast this
   user forgets. If it reports too little history, say so and carry on.
 
