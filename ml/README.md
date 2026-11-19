@@ -1,6 +1,6 @@
-# dsa-coach models
+# recall-coach models
 
-Two models for dsa-coach, trained on public data and evaluated on data they never saw.
+Two models for recall-coach, trained on public data and evaluated on data they never saw.
 
 | Model | Question it answers | Shipped as |
 |---|---|---|
@@ -20,14 +20,14 @@ rating but "again") or not.
 **Features.** The card's history before the review (time since last review, number of
 reviews, lapses, last and mean rating, card age), the user's running recall rate, and
 the state FSRS with default parameters holds at that moment (retrievability, stability,
-difficulty). Answer time is left out of the shipped model because dsa-coach does not
+difficulty). Answer time is left out of the shipped model because recall-coach does not
 record it.
 
 **Evaluation 1: users never seen.** Trained on 300 users, scored on the other 100.
 
 | Model | AUC ↑ | Log-loss ↓ | ECE ↓ |
 |---|---|---|---|
-| FSRS, default parameters (dsa-coach before) | 0.744 | 0.348 | 0.008 |
+| FSRS, default parameters (recall-coach before) | 0.744 | 0.348 | 0.008 |
 | Recall model, shipped (no answer time) | **0.791** | **0.326** | **0.007** |
 
 **Evaluation 2: against FSRS tuned to each user.** For 30 held-out users, FSRS is fitted
@@ -40,7 +40,7 @@ on the first half of the user's own reviews; every model is scored on the second
 | Recall model (never saw this user) | **0.849** | **0.323** | 0.024 | **0.824** |
 
 The recall model ranks better than FSRS fitted to the user's own history while needing
-none of it; tuned FSRS is better calibrated. dsa-coach uses the recall model from the
+none of it; tuned FSRS is better calibrated. recall-coach uses the recall model from the
 first review and can blend in tuned FSRS once a user has enough history.
 
 **Caveats.** Flashcards, not DSA problems: how well this transfers is measured on users'
@@ -85,7 +85,7 @@ held-out judge is replayed from scratch.
 | | **Topic Elo** | **0.699** | **0.624** | **0.020** |
 
 Topic Elo ranks as well as LightGBM on every unseen judge and stays calibrated where
-LightGBM does not, so it is what dsa-coach ships: a few kilobytes of parameters, updated
+LightGBM does not, so it is what recall-coach ships: a few kilobytes of parameters, updated
 after every attempt. A two-number correction fitted on a judge's first 5% of attempts
 (slope limited to 0.25-4) helps a little on Codeforces (ECE 0.020 → 0.013) and is kept
 as an optional per-user step.

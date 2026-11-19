@@ -35,6 +35,10 @@ class Settings:
     prior_scale: float = 1.0
     # Starting base rate for a platform nothing is known about: the training judges'.
     start_rate: float = 0.65
+    # Weight of the user's own published rating at the time of the attempt, on the same
+    # scale as problem ratings (0 = ignore it). Where both exist the model starts from
+    # the judge's own definition: equal ratings mean even odds.
+    user_rating_scale: float = 0.0
 
 
 def run(
@@ -44,11 +48,13 @@ def run(
     y: np.ndarray,
     rating: np.ndarray,
     settings: Settings = Settings(),
+    user_rating: np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
     """Replay attempts in time order and predict each before seeing its outcome.
 
     users, problems: integer codes per attempt. problem_topics: each problem code's
-    common topic ids. rating: each problem code's published rating, NaN if none."""
+    common topic ids. rating: each problem code's published rating, NaN if none.
+    user_rating: per attempt, the user's published rating at that moment, NaN if none."""
 
     s = settings
     n_users = users.max() + 1
@@ -70,6 +76,8 @@ def run(
         topics = problem_topics[q]
         t_skill = sum(topic_skill.get((u, t), 0.0) for t in topics) / len(topics) if topics else 0.0
         z = bias + skill[u] + t_skill - difficulty[q]
+        if user_rating is not None and not math.isnan(user_rating[i]):
+            z += s.user_rating_scale * ELO_TO_LOGIT * (user_rating[i] - center)
         p = 1.0 / (1.0 + math.exp(-z))
         pred[i], skill_at[i], topic_at[i], diff_at[i] = p, skill[u], t_skill, difficulty[q]
 

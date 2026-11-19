@@ -26,7 +26,7 @@ from .train_recall import DEPLOYABLE
 ROOT = Path(__file__).resolve().parents[3]
 ARTIFACTS = Path(__file__).resolve().parents[2] / "artifacts"
 DATA = Path(__file__).resolve().parents[2] / "data"
-OUT = ROOT / "src" / "dsa_coach_mcp" / "trained"
+OUT = ROOT / "src" / "recall_coach" / "trained"
 
 
 def flatten(node: dict, nodes: list) -> int:

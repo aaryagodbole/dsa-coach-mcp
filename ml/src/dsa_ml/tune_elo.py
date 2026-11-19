@@ -10,6 +10,7 @@ setting dsa-coach ships is the one best across all judges.
 
 from __future__ import annotations
 
+import gzip
 import itertools
 import json
 from dataclasses import asdict, replace
@@ -26,10 +27,28 @@ from .train_solve import scores
 DATA = Path(__file__).resolve().parents[2] / "data"
 ARTIFACTS = Path(__file__).resolve().parents[2] / "artifacts"
 GRID = {
-    "prior_scale": (0.15, 0.3, 0.5),
+    "prior_scale": (0.1, 0.15, 0.2),
     "k_user": (0.2, 0.4),
     "k_topic": (0.1, 0.3),
+    "user_rating_scale": (0.0, 0.1, 0.2),
 }
+
+
+def user_ratings(df: pd.DataFrame) -> np.ndarray:
+    """Each Codeforces attempt's user rating at that moment (NaN before their first
+    rated contest, or where no history was collected)."""
+
+    rows = []
+    for path in (DATA / "raw" / "codeforces" / "ratings").glob("*.json.gz"):
+        with gzip.open(path, "rt") as f:
+            for change in json.load(f):
+                rows.append((path.name.removesuffix(".json.gz"), change["at"], change["rating"]))
+    if not rows:
+        return np.full(len(df), np.nan)
+    history = pd.DataFrame(rows, columns=["user", "at", "rating"]).sort_values("at")
+    left = df[["user", "at"]].reset_index().sort_values("at")
+    merged = pd.merge_asof(left, history, on="at", by="user", direction="backward")
+    return merged.set_index("index").loc[df.index, "rating"].to_numpy(dtype=float)
 
 
 def judges() -> dict[str, dict]:
@@ -50,6 +69,7 @@ def judges() -> dict[str, dict]:
             "rating": np.array(
                 [published.get(source, {}).get(p, np.nan) for p in names], dtype=float
             ),
+            "user_rating": user_ratings(df) if source == "codeforces" else None,
         }
     return out
 
@@ -66,7 +86,9 @@ def main() -> None:
     for i, s in enumerate(settings):
         preds, loss = {}, {}
         for name, d in data.items():
-            p = elo.run(d["users"], d["problems"], d["topics"], d["y"], d["rating"], s)["p"]
+            p = elo.run(
+                d["users"], d["problems"], d["topics"], d["y"], d["rating"], s, d["user_rating"]
+            )["p"]
             preds[name] = p
             loss[name] = scores(d["y"], p)["log_loss"]
         predictions.append(preds)
