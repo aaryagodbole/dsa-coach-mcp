@@ -165,6 +165,21 @@ class ReviewEvidence(BaseModel):
     reason: str
 
 
+class ImportResult(BaseModel):
+    platform: str
+    handle: str
+    # Problems added, each with its first accepted submission as its first review.
+    imported: int
+    # Accepted problems skipped because they are already tracked here.
+    already_tracked: int
+    # Accepted problems left for a later call, beyond the limit.
+    remaining: int
+    # Revisions due now, across every platform, after the import.
+    due_now: int
+    # What the platform's data cannot tell, so the import may be partial.
+    limitations: list[str] = Field(default_factory=list)
+
+
 class TopicForecast(BaseModel):
     tag: str
     problems: int
