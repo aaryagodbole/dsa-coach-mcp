@@ -15,7 +15,8 @@ or platform the tools did not give you.
 
 1. Call `list_platforms` once to learn each platform's tags and levels.
 2. Call `get_profile` for every platform the user named whose `source` is `platform`.
-   When the user tells you a username, save it with `link_account`; after that the
+   When the user tells you a username or pastes a profile link, save it with
+   `link_account` (pass the link as `handle`); after that the
    handle can be left out. Then offer `import_solved`: it tracks the problems they
    already solved there, counting each first accept as a review, so revisions start
    from their real history instead of an empty one. Say how many it imported and

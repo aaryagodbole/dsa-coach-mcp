@@ -1,6 +1,6 @@
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
-import { Accounts } from "./components/Accounts";
+import { Accounts, type LinkProfile } from "./components/Accounts";
 import { Calibration } from "./components/Calibration";
 import { Checklists } from "./components/Checklists";
 import { Coach, type SendMessage } from "./components/Coach";
@@ -41,6 +41,38 @@ export function App() {
         }
       }
     : null;
+  // Hosts that let the view call the server's tools can link and import right here.
+  const link: LinkProfile | null =
+    app && app.getHostCapabilities()?.serverTools
+      ? async (url) => {
+          const text = (r: { content?: { type: string; text?: string }[] }) =>
+            r.content?.find((c) => c.type === "text")?.text ?? "Something went wrong.";
+          try {
+            const linked = await app.callServerTool({
+              name: "link_account",
+              arguments: { handle: url },
+            });
+            if (linked.isError) return { ok: false, text: text(linked) };
+            const account = linked.structuredContent as { platform: string; handle: string };
+            const imported = await app.callServerTool({
+              name: "import_solved",
+              arguments: { platform: account.platform },
+            });
+            const counts = imported.structuredContent as { imported: number; due_now: number };
+            const refreshed = await app.callServerTool({ name: "show_dashboard", arguments: {} });
+            if (refreshed.structuredContent) {
+              setData(refreshed.structuredContent as unknown as Dashboard);
+            }
+            const tail = imported.isError
+              ? ` Couldn't import your solved problems: ${text(imported)}`
+              : ` Imported ${counts.imported} solved problems; ${counts.due_now} due. ` +
+                'Press "Plan my session" for problems picked for you.';
+            return { ok: true, text: `Linked ${account.platform} as ${account.handle}.${tail}` };
+          } catch (e) {
+            return { ok: false, text: e instanceof Error ? e.message : String(e) };
+          }
+        }
+      : null;
   const { insights } = data;
   return (
     <main>
@@ -51,7 +83,7 @@ export function App() {
       <Coach steps={data.next_steps ?? []} openLink={openLink} send={send} />
       <DueList due={data.due} total={data.due_total ?? data.due.length} openLink={openLink} />
       <SkillMap skills={data.skills ?? { tags: [], unreviewed: [] }} />
-      <Accounts accounts={data.accounts ?? []} />
+      <Accounts accounts={data.accounts ?? []} link={link} send={send} />
       <Checklists checklists={data.checklists ?? []} />
       <Platforms progress={data.progress} />
       <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />

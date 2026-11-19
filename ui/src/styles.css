@@ -99,6 +99,23 @@ h2 { font-size: 17px; font-weight: 900; text-transform: uppercase; letter-spacin
 .checklist input:checked + span .kind { text-decoration: line-through; text-decoration-thickness: 2px; }
 
 /* Linked accounts. */
+.paste { margin: 0 0 14px; }
+.paste label { display: block; font-weight: 800; font-size: 12.5px; margin-bottom: 6px; }
+.paste-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.paste input {
+  flex: 1 1 220px; min-width: 0; font: inherit; padding: 7px 10px; color: var(--fg);
+  background: var(--bg); border: 2px solid var(--ink); border-radius: 6px;
+}
+.paste input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.paste button {
+  font: inherit; font-weight: 800; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em;
+  padding: 7px 16px; cursor: pointer; border: 2px solid var(--ink); border-radius: 6px;
+  background: var(--accent); color: var(--on-accent); box-shadow: 3px 3px 0 var(--ink);
+}
+.paste button:disabled { opacity: .55; cursor: default; }
+.paste button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.paste-ok { margin: 8px 0 0; color: var(--ok); font-weight: 700; }
+.paste-err { margin: 8px 0 0; color: var(--risk); font-weight: 700; }
 .grid.accounts { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .account .name { font-size: 16px; }
 .tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }

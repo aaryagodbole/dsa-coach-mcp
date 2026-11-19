@@ -6,6 +6,7 @@ is useful without a model."""
 from __future__ import annotations
 
 import asyncio
+import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
@@ -100,6 +101,9 @@ _RELABEL = ToolAnnotations(
 _IMPORT = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
 )
+# A username in a profile link: leetcode.com/u/NAME, leetcode.com/NAME,
+# codeforces.com/profile/NAME and the like.
+_PROFILE_PATH = re.compile(r"^/(?:u/|profile/|users?/)?([^/]+)/?$")
 # Revisions the dashboard lists for today. After an import many fall due at once; a
 # short list a day, most at risk first, is one the user can actually finish.
 TODAY_REVISIONS = 5
@@ -308,12 +312,44 @@ def create_server(
             profile.rejections_public,
         )
 
-    @server.tool(annotations=_LINK_ACCOUNT)
-    async def link_account(platform: str, handle: NonBlank) -> AccountStats:
-        """Save the user's username on a platform, replacing any saved before, after
-        checking it exists. Tools that take a handle default to it, and show_dashboard
-        shows this account's stats. Returns those stats."""
+    def from_profile_url(text: str) -> tuple[str, str] | None:
+        """The platform and username in a pasted profile link, or None for a bare
+        username."""
 
+        if "/" not in text:
+            return None
+        parts = urlsplit(text if "://" in text else f"https://{text}")
+        host = (parts.hostname or "").removeprefix("www.")
+        adapter = adapter_for_host(host)
+        if adapter is None:
+            known = sorted(h for a in adapters.values() for h in a.hosts)
+            raise ToolError(f"{host or text} is not a platform with an adapter. Known: {known}")
+        match = _PROFILE_PATH.match(parts.path)
+        if match is None:
+            raise ToolError(
+                f"{text} is not a profile link. Paste the page that shows the username, "
+                "such as https://leetcode.com/u/NAME/ or https://codeforces.com/profile/NAME"
+            )
+        return adapter.name, match.group(1)
+
+    @server.tool(annotations=_LINK_ACCOUNT)
+    async def link_account(handle: NonBlank, platform: str | None = None) -> AccountStats:
+        """Save the user's username on a platform, replacing any saved before, after
+        checking it exists. ``handle`` is the username, or a link to the user's profile
+        page as they pasted it (the platform is then read from the link). Tools that take
+        a handle default to it, and show_dashboard shows this account's stats. Returns
+        those stats."""
+
+        parsed = from_profile_url(handle.strip())
+        if parsed is not None:
+            linked_on, handle = parsed
+            if platform is not None and platform != linked_on:
+                raise ToolError(f"That link is a {linked_on} profile, not {platform}.")
+            platform = linked_on
+        if platform is None:
+            raise ToolError(
+                f"Which platform is '{handle}' on? Pass platform, or paste the profile link."
+            )
         adapter = adapter_for(platform)
         async with _platform_errors(platform):
             profile = await adapter.profile(handle)

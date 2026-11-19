@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Paste a profile link instead of a username: `link_account` reads the platform and
+  username from links such as `https://leetcode.com/u/NAME/` or
+  `https://codeforces.com/profile/NAME`. The dashboard's **My platforms** panel has a
+  box for it: in hosts that let the view call tools, it links the account, imports your
+  solved problems and refreshes; elsewhere it sends the request to your assistant or
+  shows it to paste.
 - The dashboard opens on **Today**: the five revisions you are most likely to forget,
   with how many more are due, instead of every overdue problem at once. After an import
   the rest come up on later days. `show_dashboard`'s `limit` sets how many.

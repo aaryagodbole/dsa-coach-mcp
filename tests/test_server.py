@@ -976,3 +976,36 @@ async def test_dashboard_lists_todays_revisions_and_counts_the_rest(
     assert (len(wider["due"]), wider["due_total"]) == (7, 7)
     recall = [c["retrievability"] for c in dashboard["due"]]
     assert recall == sorted(recall)
+
+
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "https://example.com/u/alice/",
+        "https://www.example.com/profile/alice",
+        "example.com/alice",
+    ],
+)
+async def test_link_account_reads_the_platform_and_username_from_a_profile_link(
+    server: MCPServer, pasted: str
+) -> None:
+    stats = await call(server, "link_account", handle=pasted)
+
+    assert (stats["platform"], stats["handle"]) == ("fake", "alice")
+    assert (await call(server, "get_profile", platform="fake"))["handle"] == "alice"
+
+
+@pytest.mark.parametrize(
+    ("arguments", "error"),
+    [
+        ({"handle": "https://nowhere.test/u/alice"}, "not a platform with an adapter"),
+        ({"handle": "https://example.com/problems/p0/"}, "not a profile link"),
+        ({"handle": "https://example.com/u/alice", "platform": "other"}, "a fake profile, not"),
+        ({"handle": "alice"}, "Which platform"),
+    ],
+)
+async def test_link_account_explains_a_link_or_handle_it_cannot_use(
+    server: MCPServer, arguments: dict[str, str], error: str
+) -> None:
+    with pytest.raises(ToolError, match=error):
+        await server.call_tool("link_account", arguments)

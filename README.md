@@ -71,7 +71,7 @@ flowchart LR
 | --- | --- |
 | `list_platforms` | Connected platforms, with the tags and levels each accepts as filters |
 | `get_profile` | Your level, solved and unsolved counts per tag, and recent submissions |
-| `link_account` / `unlink_account` | Saves (or forgets) your username on a platform, so tools default to it and the dashboard shows that account |
+| `link_account` / `unlink_account` | Saves (or forgets) your username on a platform (or reads it from a pasted profile link), so tools default to it and the dashboard shows that account |
 | `import_solved` | Starts tracking the problems you already solved on a platform, most recent first, with each first accepted submission as its first review (good on the first try, hard after rejected tries), so you don't log them one by one. Problems already tracked are left alone |
 | `search_problems` | Problems with every given tag at a given level, optionally skipping ones you solved |
 | `log_review` | Records how you did (`again` / `hard` / `good` / `easy`), journals the mistakes behind it, and schedules the next revision with FSRS. Title, link and tags come from the platform |
