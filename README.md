@@ -10,14 +10,18 @@
 
 *Formerly `dsa-coach-mcp`: existing installs, configs and history keep working (see [Configuration](#configuration)).*
 
-A DSA practice coach for any judge: an [MCP](https://modelcontextprotocol.io) server for
-Claude, Cursor or any MCP client, a dashboard, and models trained on public data that
-predict what you are about to forget and what you can solve next. It turns your practice
-into a coach: revise what you solved on a
-spaced-repetition schedule, with a **mistake journal** that remembers *why* you got
-things wrong and builds your next practice set around it. On **LeetCode** and
-**Codeforces** it also reads your history live, shows where you stand and finds
-problems to try next; problems from any other judge are recorded as you solve them.
+**Remember what you solved. Practise what you can just about solve.**
+
+recall-coach is a DSA practice coach for LeetCode, Codeforces and any other judge. It
+has three parts:
+
+- **An [MCP](https://modelcontextprotocol.io) server** for Claude, Cursor or any MCP
+  client: it reads your history from the platforms, schedules revision, and keeps a
+  **mistake journal** of *why* you got things wrong.
+- **A dashboard**, inside your AI chat or in the browser: what to revise today, what you
+  still know per topic, and your own pre-submit checklist.
+- **Models trained on public data** that predict what you are about to forget and what
+  you can solve next, evaluated on people and platforms they never saw.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/aaryagodbole/recall-coach/main/docs/demo.svg" alt="recall-coach driven over stdio on live LeetCode and Codeforces data" width="820">
@@ -26,28 +30,56 @@ problems to try next; problems from any other judge are recorded as you solve th
 
 ## Why
 
-Practice data is split across sites, and each grades difficulty its own way
-(LeetCode's Easy/Medium/Hard, Codeforces' 800-3500 ratings). Most trackers count
-problems; few tell you what you are forgetting. This server puts both platforms
-behind one interface and schedules revision with
-[FSRS](https://github.com/open-spaced-repetition/fsrs4anki/wiki/ABC-of-FSRS), so the model
-you already talk to can coach you.
+You solve a problem, move on, and three weeks later it is gone. Most trackers count
+what you have ever solved; few tell you what you still know, and none tell you which
+problem you are about to forget.
 
-FSRS predicts the chance you still remember each problem and brings it back just before
-that chance drops below 90%. In the open
-[spaced-repetition benchmark](https://github.com/open-spaced-repetition/srs-benchmark)
-over ~10k Anki collections, FSRS predicted recall better than SM-2 for the large
-majority of users. Once you have a review history, `personalize_schedule` fits its
-parameters to how fast **you** forget.
+recall-coach puts your platforms behind one interface, brings each problem back just
+before you are likely to forget it, and builds practice around the mistakes you keep
+making. Counting solved problems hides the real signal: the same few mistakes,
+repeated. Every review can carry the mistakes behind it, and the assistant turns those
+patterns into practice sets and quizzes aimed at exactly what you keep missing.
 
-Counting solved problems hides the real signal: the same few mistakes, repeated. Every
-review can carry the mistakes behind it, and the model turns those patterns into
-practice sets and revision quizzes aimed at exactly what you keep missing.
+## Models
+
+Both models are trained and evaluated in [`ml/`](https://github.com/aaryagodbole/recall-coach/tree/main/ml)
+on public data, and scored only on data they never trained on. Full method, results
+and caveats: [`ml/README.md`](https://github.com/aaryagodbole/recall-coach/blob/main/ml/README.md).
+
+**Recall: will you still remember this problem?** Gradient-boosted trees on a
+problem's review history and its [FSRS](https://github.com/open-spaced-repetition/fsrs4anki/wiki/ABC-of-FSRS)
+memory state, trained on 7M reviews from 300 users of the
+[anki-revlogs-10k](https://huggingface.co/datasets/open-spaced-repetition/anki-revlogs-10k)
+dataset. It ranks what to revise.
+
+| On users it never saw | AUC ↑ | Log-loss ↓ |
+| --- | --- | --- |
+| FSRS, default parameters | 0.789 | 0.365 |
+| FSRS, tuned on the user's own first half | 0.840 | 0.327 |
+| **recall-coach** (no data from that user) | **0.849** | **0.323** |
+| **recall-coach** + a two-number per-user correction | **0.856** | **0.314** |
+
+When it says 70%, about 70% of those problems are remembered: predicted and actual
+recall agree within a few points in every band. It ships as 46 KB of plain arrays read
+in Python, so the package needs no ML library.
+
+**Solve: will you solve this problem on your first try?** An online Elo model with a
+skill per topic, trained on [Project CodeNet](https://github.com/IBM/Project_CodeNet)
+(AtCoder, AIZU) and Codeforces, with problem difficulty starting from each judge's own
+published rating. Evaluated leaving each judge out entirely, it ranks as well as
+LightGBM (AUC 0.70–0.80) and stays calibrated where LightGBM does not. It will power
+problem recommendations at a chosen chance of success.
+
+**Limits, measured and stated.** Within one person, every method ranks recall at about
+0.70 AUC: forgetting depends on things no log records. The recall model learned from
+flashcards, not DSA problems; your own reviews check it, in the dashboard's
+calibration panel. LeetCode publishes no failed attempts, so the solve model cannot be
+evaluated on LeetCode before use.
 
 ## Design
 
 The server returns **data, not decisions**. It never hardcodes what counts as a weak
-topic or the next level up; the model reads your profile and the platform's own
+topic or the next level up; the assistant reads your profile and the platform's own
 vocabulary and decides.
 
 ```mermaid
@@ -57,17 +89,22 @@ flowchart LR
     Registry --> LC["LeetCodeAdapter<br/>GraphQL"]
     Registry --> CF["CodeforcesAdapter<br/>REST"]
     Server --> SRS["scheduling.py<br/>FSRS"] --> Store[("SQLite<br/>cards, reviews,<br/>mistakes")]
+    Server --> Recall["recall.py<br/>trained recall model"]
+    Server --> UI["dashboard<br/>(MCP App)"]
 ```
 
 - **Adapters** translate one platform's API into shared models (`Problem`, `Profile`,
   `PlatformInfo`). Nothing outside an adapter names a platform.
 - **Data comes from the platforms.** Tags and levels are read from each platform's
   API, and a review takes the problem's title, link and tags from the platform rather
-  than from the model, so nothing in your history is invented. Platforms' own tag
+  than from the assistant, so nothing in your history is invented. Platforms' own tag
   lists are incomplete, so `search_problems` accepts a tag outside them and only
   reports it when nothing matched.
 - **Profiles say what they can't see.** Each profile carries `limitations`, e.g.
   LeetCode only exposes your 20 most recent accepted submissions publicly.
+- **FSRS still schedules** each revision's next date, and `personalize_schedule` fits
+  its parameters to how fast **you** forget once you have a review history; the recall
+  model decides which due problem comes first.
 
 ## Tools
 
@@ -105,21 +142,21 @@ flowchart LR
 
 ### Dashboard
 
-`show_dashboard` has three tabs, **Today**, **Skills** and **Insights**. Today opens with **Do this next**: up to four steps picked from your own data
-by fixed rules (the revision you're most likely to forget, a mistake that keeps coming
-back, a weak topic, and a problem you were overconfident about), plus **Weekly report**,
-**Plan my session** and **Quiz me** buttons that ask your assistant in the chat.
-**What you still know** sets what you solved per topic against how many of the problems
-you revised you'd still get right today (FSRS recall), and lists topics you solved but
-never revised. **Before you submit** turns your mistake journal into a checklist per
-topic, most frequent mistake first, with your own note on each. It then
-shows **live stats for each account you linked** (solved per level or
-your rating, your strongest tags, tags you tried and never solved, and tags you've barely
-practised), progress per platform, today's revisions (the five you are most likely to forget, with a count of the rest), and what your own
-history says about your memory: a **forgetting forecast** (recall per tag now and in two
-weeks if you revise nothing), **mistake recovery** (reviews since each mistake last
-happened), **overconfidence** (problems rated easy and failed at the next review) and
-**calibration** (FSRS's predicted recall against how often you actually recalled).
+`show_dashboard` has three tabs:
+
+- **Today**: **Do this next**, up to four steps picked from your own data by fixed rules
+  (the revision you're most likely to forget, a mistake that keeps coming back, a weak
+  topic, a problem you were overconfident about), with **Weekly report**, **Plan my
+  session** and **Quiz me** buttons that ask your assistant in the chat; your five
+  revisions most at risk, ranked by the recall model, with how many more are due; and
+  **Before you submit**, a checklist per topic from your own mistake journal.
+- **Skills**: **What you still know**, what you solved per topic against how many of
+  those you'd still get right today; **My platforms**, live stats for each linked
+  account (paste your profile link to link one); and revision progress per platform.
+- **Insights**: what your own history says about your memory: a **forgetting
+  forecast** per topic, **mistake recovery**, **overconfidence** (problems rated easy
+  then failed) and **calibration** (predicted recall against how often you actually
+  recalled).
 
 It is an [MCP App](https://modelcontextprotocol.io/docs/extensions/apps):
 hosts that support them (Claude, Claude Desktop, VS Code Copilot, Goose and others) render

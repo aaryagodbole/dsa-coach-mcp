@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "DSA practice coach for any judge: an MCP server, a dashboard and trained models for what you will forget and what you can solve next"
 readme = "README.md"
 license = "MIT"
-keywords = ["mcp", "model-context-protocol", "leetcode", "codeforces", "dsa", "spaced-repetition"]
+keywords = ["mcp", "model-context-protocol", "leetcode", "codeforces", "dsa", "spaced-repetition", "fsrs", "machine-learning", "knowledge-tracing", "elo"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.12",
