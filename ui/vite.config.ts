@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), viteSingleFile()],
   build: {
     rollupOptions: { input: "dashboard.html" },
-    outDir: "../src/dsa_coach_mcp/ui",
+    outDir: "../src/recall_coach/ui",
     emptyOutDir: false,
   },
 });

@@ -5,8 +5,8 @@ from typing import Any
 import httpx
 import pytest
 
-from dsa_coach_mcp.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
-from dsa_coach_mcp.platforms.codeforces import CodeforcesAdapter
+from recall_coach.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
+from recall_coach.platforms.codeforces import CodeforcesAdapter
 
 
 def problem(contest: int, index: str, tags: list[str], rating: int | None) -> dict[str, Any]:

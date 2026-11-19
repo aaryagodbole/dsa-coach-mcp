@@ -5,8 +5,8 @@ from typing import Any
 import httpx
 import pytest
 
-from dsa_coach_mcp.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
-from dsa_coach_mcp.platforms.leetcode import LeetCodeAdapter
+from recall_coach.platforms import PlatformError, ProblemNotFoundError, UserNotFoundError
+from recall_coach.platforms.leetcode import LeetCodeAdapter
 
 from .conftest import graphql_body, mock_client
 

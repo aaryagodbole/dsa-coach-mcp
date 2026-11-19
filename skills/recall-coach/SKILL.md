@@ -1,13 +1,13 @@
 ---
-name: dsa-coach
-description: "Coaches DSA and coding-interview practice with the dsa-coach MCP server. Use when the user talks about LeetCode, Codeforces or any other judge, asks what to practise or revise, reports solving or failing a problem, or wants to see their progress or recurring mistakes."
+name: recall-coach
+description: "Coaches DSA and coding-interview practice with the recall-coach MCP server. Use when the user talks about LeetCode, Codeforces or any other judge, asks what to practise or revise, reports solving or failing a problem, or wants to see their progress or recurring mistakes."
 license: MIT
-compatibility: "Needs the dsa-coach MCP server (uvx dsa-coach-mcp). Optional: a browser MCP server for platforms without an adapter."
+compatibility: "Needs the recall-coach MCP server (uvx recall-coach). Optional: a browser MCP server for platforms without an adapter."
 ---
 
 # DSA coach
 
-The dsa-coach tools return data, not decisions. Reading that data and deciding what is
+The recall-coach tools return data, not decisions. Reading that data and deciding what is
 weak, what comes next and how to say it is your job; never invent a tag, level, problem
 or platform the tools did not give you.
 

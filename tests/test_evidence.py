@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from dsa_coach_mcp.evidence import review_evidence
-from dsa_coach_mcp.models import Problem, ReviewEvidence, Submission
+from recall_coach.evidence import review_evidence
+from recall_coach.models import Problem, ReviewEvidence, Submission
 
 AT = datetime(2026, 2, 1, tzinfo=UTC)
 

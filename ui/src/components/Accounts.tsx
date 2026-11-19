@@ -7,7 +7,7 @@ export type LinkProfile = (url: string) => Promise<{ ok: boolean; text: string }
 
 function linkRequest(url: string): string {
   return (
-    `Using dsa-coach, link my profile ${url}, import the problems I already solved there, ` +
+    `Using recall-coach, link my profile ${url}, import the problems I already solved there, ` +
     "and suggest problems for my weakest topics."
   );
 }

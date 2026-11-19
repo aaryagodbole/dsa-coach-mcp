@@ -1,4 +1,4 @@
-// Mirrors the Dashboard model in src/dsa_coach_mcp/models.py.
+// Mirrors the Dashboard model in src/recall_coach/models.py.
 
 export interface PlatformProgress {
   platform: string;

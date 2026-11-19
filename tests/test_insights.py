@@ -4,9 +4,9 @@ from datetime import UTC, date, datetime, timedelta
 
 from fsrs import Card, Rating
 
-from dsa_coach_mcp.insights import calibration, forecast, overconfidence, recovery
-from dsa_coach_mcp.scheduling import make_scheduler
-from dsa_coach_mcp.store import CardHistory
+from recall_coach.insights import calibration, forecast, overconfidence, recovery
+from recall_coach.scheduling import make_scheduler
+from recall_coach.store import CardHistory
 
 AT = datetime(2026, 3, 1, 9, tzinfo=UTC)
 FSRS = make_scheduler(None, fuzz=False)

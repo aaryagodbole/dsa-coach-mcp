@@ -51,4 +51,4 @@ jobs:
         run: npm run build
       # The package ships the built file, so it must match the source.
       - name: Built dashboard is committed
-        run: git diff --exit-code -- ../src/dsa_coach_mcp/ui/dashboard.html
+        run: git diff --exit-code -- ../src/recall_coach/ui/dashboard.html

@@ -4,8 +4,8 @@ from datetime import date
 
 import pytest
 
-from dsa_coach_mcp.models import AccountStats, TopicForecast
-from dsa_coach_mcp.skills import checklists, skill_map, tag_key
+from recall_coach.models import AccountStats, TopicForecast
+from recall_coach.skills import checklists, skill_map, tag_key
 
 
 def topic(tag: str, problems: int, recall: float) -> TopicForecast:

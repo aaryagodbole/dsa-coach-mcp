@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fsrs import Card, Rating
 
-from dsa_coach_mcp.models import Mistake, Problem
-from dsa_coach_mcp.store import ReviewStore
+from recall_coach.models import Mistake, Problem
+from recall_coach.store import ReviewStore
 
 AT = datetime(2026, 1, 1, 9, tzinfo=UTC)
 
@@ -227,3 +227,39 @@ def test_rename_mistake_kind_relabels_only_that_kind(tmp_path: Path) -> None:
     assert store.rename_mistake_kind("a", "b") == 1
     assert store.rename_mistake_kind("a", "b") == 0
     assert [(k.kind, k.count) for k in store.mistake_kinds()] == [("b", 2)]
+
+
+@pytest.fixture
+def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    from recall_coach import store as store_module
+
+    monkeypatch.delenv("RECALL_COACH_DB", raising=False)
+    monkeypatch.delenv("DSA_COACH_DB", raising=False)
+    monkeypatch.setattr(store_module, "DEFAULT_DB_PATH", tmp_path / ".recall-coach" / "coach.db")
+    monkeypatch.setattr(store_module, "LEGACY_DB_PATH", tmp_path / ".dsa-coach" / "coach.db")
+    return tmp_path
+
+
+def test_a_new_install_uses_the_new_folder(home: Path) -> None:
+    from recall_coach.store import default_db_path
+
+    assert default_db_path() == home / ".recall-coach" / "coach.db"
+
+
+def test_history_from_before_the_rename_keeps_being_used(home: Path) -> None:
+    from recall_coach.store import default_db_path
+
+    old = home / ".dsa-coach" / "coach.db"
+    old.parent.mkdir()
+    old.touch()
+
+    assert default_db_path() == old
+
+
+def test_both_variables_still_choose_the_file(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from recall_coach.store import default_db_path
+
+    monkeypatch.setenv("DSA_COACH_DB", str(home / "old.db"))
+    assert default_db_path() == home / "old.db"
+    monkeypatch.setenv("RECALL_COACH_DB", str(home / "new.db"))
+    assert default_db_path() == home / "new.db"

@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from dsa_coach_mcp.browser import dashboard_page, host_page, make_server
-from dsa_coach_mcp.server import create_server
-from dsa_coach_mcp.store import ReviewStore
+from recall_coach.browser import dashboard_page, host_page, make_server
+from recall_coach.server import create_server
+from recall_coach.store import ReviewStore
 
 
 def script_json(page: str, name: str) -> object:

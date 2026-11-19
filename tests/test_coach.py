@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from dsa_coach_mcp.coach import next_steps
-from dsa_coach_mcp.models import (
+from recall_coach.coach import next_steps
+from recall_coach.models import (
     AccountStats,
     Insights,
     MistakeRecovery,

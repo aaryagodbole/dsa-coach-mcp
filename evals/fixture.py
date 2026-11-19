@@ -8,10 +8,10 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
-from dsa_coach_mcp.models import PlatformInfo, Problem, Profile
-from dsa_coach_mcp.platforms import ProblemNotFoundError, UserNotFoundError
-from dsa_coach_mcp.server import create_server
-from dsa_coach_mcp.store import ReviewStore
+from recall_coach.models import PlatformInfo, Problem, Profile
+from recall_coach.platforms import ProblemNotFoundError, UserNotFoundError
+from recall_coach.server import create_server
+from recall_coach.store import ReviewStore
 
 PLATFORM = "practice"
 HANDLE = "learner"

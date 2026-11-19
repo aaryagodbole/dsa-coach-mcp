@@ -65,7 +65,7 @@ server) and call record_problem with its URL, title and tags before log_review."
 
 # MCP Apps (io.modelcontextprotocol/ui, spec 2026-01-26): a tool names a ui:// resource
 # that hosts render as an interactive view; other hosts just show the tool's result.
-DASHBOARD_URI = "ui://dsa-coach/dashboard"
+DASHBOARD_URI = "ui://recall-coach/dashboard"
 # How far ahead the dashboard forecasts recall if nothing is revised.
 FORECAST_DAYS = 14
 MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
@@ -152,7 +152,7 @@ def create_server(
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     fuzz: bool = True,
 ) -> MCPServer:
-    server = MCPServer(name="dsa-coach", instructions=_INSTRUCTIONS)
+    server = MCPServer(name="recall-coach", instructions=_INSTRUCTIONS)
     # Read, reschedule and write one card at a time, so overlapping reviews never
     # both start from the same previous schedule.
     review_lock = asyncio.Lock()
@@ -705,7 +705,7 @@ def create_server(
     def dashboard_view() -> str:
         """Interactive view for show_dashboard."""
 
-        return files("dsa_coach_mcp").joinpath("ui/dashboard.html").read_text("utf-8")
+        return files("recall_coach").joinpath("ui/dashboard.html").read_text("utf-8")
 
     @server.tool(annotations=_READ_REMOTE, meta={"ui": {"resourceUri": DASHBOARD_URI}})
     async def show_dashboard(

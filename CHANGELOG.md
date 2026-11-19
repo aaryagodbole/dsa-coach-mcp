@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed from `dsa-coach-mcp` to **recall-coach**: it is now an MCP server, a
+  dashboard and trained models, not only an MCP server. Install with `uvx recall-coach`;
+  the repository is github.com/aaryagodbole/recall-coach and the registry name
+  `io.github.aaryagodbole/recall-coach`. The `dsa-coach-mcp` command still works, and an
+  existing `~/.dsa-coach/coach.db` or `DSA_COACH_DB` keeps being used, so no history is
+  lost; new installs store it in `~/.recall-coach/coach.db` (`RECALL_COACH_DB`).
+
 ### Added
 
 - A trained recall model ranks revisions. Gradient-boosted trees, trained on 7M

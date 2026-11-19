@@ -238,7 +238,7 @@ class SkillTag(BaseModel):
     tag: str
     # Solved on the linked accounts; None when no linked account reports this tag.
     solved: int | None
-    # Problems with this tag reviewed in dsa-coach, so FSRS knows their memory.
+    # Problems with this tag reviewed in recall-coach, so FSRS knows their memory.
     reviewed: int
     # Mean FSRS recall of those problems now, and how many of them that adds up to:
     # the number the user would expect to get right today.

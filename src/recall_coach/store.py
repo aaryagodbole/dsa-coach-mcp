@@ -22,8 +22,12 @@ from .models import (
     Problem,
 )
 
-DB_PATH_ENV = "DSA_COACH_DB"
-DEFAULT_DB_PATH = Path.home() / ".dsa-coach" / "coach.db"
+DB_PATH_ENV = "RECALL_COACH_DB"
+DEFAULT_DB_PATH = Path.home() / ".recall-coach" / "coach.db"
+# Before the rename the project was dsa-coach-mcp: its variable and folder still work,
+# so an upgrade never strands an existing history.
+LEGACY_DB_PATH_ENV = "DSA_COACH_DB"
+LEGACY_DB_PATH = Path.home() / ".dsa-coach" / "coach.db"
 
 
 @dataclass(frozen=True)
@@ -183,7 +187,15 @@ _RECORD_SQL = (
 
 
 def default_db_path() -> Path:
-    return Path(os.environ.get(DB_PATH_ENV) or DEFAULT_DB_PATH)
+    """RECALL_COACH_DB, else the old DSA_COACH_DB, else ~/.recall-coach/coach.db, unless
+    only the old ~/.dsa-coach/coach.db exists, which is then kept in use."""
+
+    configured = os.environ.get(DB_PATH_ENV) or os.environ.get(LEGACY_DB_PATH_ENV)
+    if configured:
+        return Path(configured)
+    if not DEFAULT_DB_PATH.exists() and LEGACY_DB_PATH.exists():
+        return LEGACY_DB_PATH
+    return DEFAULT_DB_PATH
 
 
 def _to_record(row: sqlite3.Row) -> CardRecord:

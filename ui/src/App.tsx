@@ -15,7 +15,7 @@ import { SkillMap } from "./components/SkillMap";
 import { type Tab, Tabs } from "./components/Tabs";
 import type { Dashboard } from "./types";
 
-const TAB_KEY = "dsa-coach-tab";
+const TAB_KEY = "recall-coach-tab";
 const TAB_IDS = ["today", "skills", "insights"];
 
 function rememberedTab(): string {
@@ -40,7 +40,7 @@ export function App() {
     }
   };
   const { app, error } = useApp({
-    appInfo: { name: "dsa-coach-dashboard", version: "2" },
+    appInfo: { name: "recall-coach-dashboard", version: "2" },
     capabilities: {},
     onAppCreated: (created) => {
       created.ontoolresult = (result) => {
@@ -105,7 +105,7 @@ export function App() {
   return (
     <main>
       <header className="brand">
-        <div className="logo">DSA COACH</div>
+        <div className="logo">RECALL COACH</div>
         <span className="muted">{todayLabel(data.due.length, data.due_total ?? data.due.length)}</span>
       </header>
       <Tabs tabs={tabs} selected={tab} onSelect={selectTab}>
