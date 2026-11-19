@@ -101,7 +101,7 @@ flowchart LR
 
 ### Dashboard
 
-`show_dashboard` opens with **Do this next**: up to four steps picked from your own data
+`show_dashboard` has three tabs, **Today**, **Skills** and **Insights**. Today opens with **Do this next**: up to four steps picked from your own data
 by fixed rules (the revision you're most likely to forget, a mistake that keeps coming
 back, a weak topic, and a problem you were overconfident about), plus **Weekly report**,
 **Plan my session** and **Quiz me** buttons that ask your assistant in the chat.

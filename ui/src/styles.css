@@ -32,6 +32,24 @@ main { display: grid; gap: 22px; max-width: 960px; margin: 0 auto; }
 }
 .brand .muted { font-weight: 700; }
 
+/* Tabs: chunky buttons; the selected one is filled and pressed in. */
+.tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+.tab {
+  font: inherit; font-weight: 900; font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+  padding: 8px 16px; cursor: pointer; color: var(--fg); background: var(--card);
+  border: 3px solid var(--ink); border-radius: 8px; box-shadow: 3px 3px 0 var(--ink);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.tab:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+.tab.active { background: var(--accent); color: var(--on-accent); transform: translate(2px, 2px);
+              box-shadow: 1px 1px 0 var(--ink); }
+.tab:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.tab .badge { font-size: 11px; min-width: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
+              background: var(--ink); color: var(--bg); }
+.tab.active .badge { background: var(--on-accent); color: var(--accent-ink); }
+.tabpanel { display: grid; gap: 22px; }
+@media (prefers-reduced-motion: reduce) { .tab, .tab:hover, .tab.active { transform: none; } }
+
 /* Panels: card with a terracotta bar down the left edge. */
 section {
   position: relative; background: var(--card); border: 3px solid var(--ink); border-radius: 10px;

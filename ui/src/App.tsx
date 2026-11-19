@@ -12,10 +12,33 @@ import { MistakeRecovery } from "./components/MistakeRecovery";
 import { Overconfidence } from "./components/Overconfidence";
 import { Platforms } from "./components/Platforms";
 import { SkillMap } from "./components/SkillMap";
+import { type Tab, Tabs } from "./components/Tabs";
 import type { Dashboard } from "./types";
+
+const TAB_KEY = "dsa-coach-tab";
+const TAB_IDS = ["today", "skills", "insights"];
+
+function rememberedTab(): string {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    if (saved && TAB_IDS.includes(saved)) return saved;
+  } catch {
+    // Blocked storage: start on Today.
+  }
+  return "today";
+}
 
 export function App() {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [tab, setTab] = useState<string>(rememberedTab);
+  const selectTab = (id: string) => {
+    setTab(id);
+    try {
+      localStorage.setItem(TAB_KEY, id);
+    } catch {
+      // Storage can be blocked in a sandboxed view; the tab just isn't remembered.
+    }
+  };
   const { app, error } = useApp({
     appInfo: { name: "dsa-coach-dashboard", version: "2" },
     capabilities: {},
@@ -74,23 +97,42 @@ export function App() {
         }
       : null;
   const { insights } = data;
+  const tabs: Tab[] = [
+    { id: "today", label: "Today", badge: data.due.length },
+    { id: "skills", label: "Skills" },
+    { id: "insights", label: "Insights" },
+  ];
   return (
     <main>
       <header className="brand">
         <div className="logo">DSA COACH</div>
         <span className="muted">{todayLabel(data.due.length, data.due_total ?? data.due.length)}</span>
       </header>
-      <Coach steps={data.next_steps ?? []} openLink={openLink} send={send} />
-      <DueList due={data.due} total={data.due_total ?? data.due.length} openLink={openLink} />
-      <SkillMap skills={data.skills ?? { tags: [], unreviewed: [] }} />
-      <Accounts accounts={data.accounts ?? []} link={link} send={send} />
-      <Checklists checklists={data.checklists ?? []} />
-      <Platforms progress={data.progress} />
-      <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />
-      <MistakeRecovery recovery={insights.recovery} />
-      <Overconfidence reviews={insights.overconfidence} openLink={openLink} />
-      <MistakeHeatmap patterns={data.patterns} />
-      <Calibration bins={insights.calibration} />
+      <Tabs tabs={tabs} selected={tab} onSelect={selectTab}>
+        {tab === "today" && (
+          <>
+            <Coach steps={data.next_steps ?? []} openLink={openLink} send={send} />
+            <DueList due={data.due} total={data.due_total ?? data.due.length} openLink={openLink} />
+            <Checklists checklists={data.checklists ?? []} />
+          </>
+        )}
+        {tab === "skills" && (
+          <>
+            <SkillMap skills={data.skills ?? { tags: [], unreviewed: [] }} />
+            <Accounts accounts={data.accounts ?? []} link={link} send={send} />
+            <Platforms progress={data.progress} />
+          </>
+        )}
+        {tab === "insights" && (
+          <>
+            <ForgettingForecast forecast={insights.forecast} days={insights.horizon_days} />
+            <MistakeRecovery recovery={insights.recovery} />
+            <Overconfidence reviews={insights.overconfidence} openLink={openLink} />
+            <MistakeHeatmap patterns={data.patterns} />
+            <Calibration bins={insights.calibration} />
+          </>
+        )}
+      </Tabs>
     </main>
   );
 }
