@@ -27,6 +27,7 @@ ARTIFACTS = Path(__file__).resolve().parents[2] / "artifacts"
 CALIBRATION_SHARE = 0.05
 # How strongly the correction is pulled towards none (slope 1, offset 0).
 SHRINK = 50.0
+MIN_SLOPE, MAX_SLOPE = 0.25, 4.0
 
 
 def _logit(p: np.ndarray) -> np.ndarray:
@@ -47,6 +48,9 @@ def recalibrate(z: np.ndarray, y: np.ndarray) -> tuple[float, float]:
             [[np.sum(w * z * z) + SHRINK, np.sum(w * z)], [np.sum(w * z), np.sum(w) + SHRINK]]
         )
         a, b = np.array([a, b]) - np.linalg.solve(h, g)
+        # A correction may sharpen or soften the model, never invert it: a few early
+        # attempts, made while the model is still cold, can point the wrong way.
+        a = float(np.clip(a, MIN_SLOPE, MAX_SLOPE))
     return float(a), float(b)
 
 
