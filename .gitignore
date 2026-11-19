@@ -22,3 +22,7 @@ htmlcov/
 
 # Dashboard UI dependencies
 node_modules/
+
+# ML datasets and trained models (published to Hugging Face, not git)
+ml/data/
+ml/artifacts/
